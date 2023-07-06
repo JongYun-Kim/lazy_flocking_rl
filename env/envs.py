@@ -1,21 +1,60 @@
 import gym
 from gym.spaces import Box, Dict
 import numpy as np
-from sl_pso import SLPSO as optimizer
+from sl_pso import SLPSO as meta_optimizer
 
 
 class LazyAgentsCentralized(gym.Env):
     # TODO (0): [x] Should we use RELATIVE position and angle as the embeddings (observation)?
-    # TODO (1): [x] Check agent update method (t vs t+1)
-    # TODO (2): [x] Check if the reference variables in the state changes after assignment (e.g. self.is_padded)
-    # TODO (3): [x] Determine the terminal condition
+    # TODO (1): [o] Check agent update method (t vs t+1)
+    # TODO (2): [△] Check if the reference variables in the state changes after assignment (e.g. self.is_padded)
+    #   TODO (2-1): [o] Fully connected network cases -> working; ok!
+    #   TODO (2-2): [o] No changes in the network topology -> working; ok!
+    #   TODO (2-3): [x] Network changes -> not working; yet!
+    # TODO (3): [△] Determine the terminal condition
+    #   TODO (3-1): [o] Check the paper's method
+    #   TODO (3-2): [o] Check the code's method:
+    #                   (1) position error, (2) changes in std of pos and (3) vel in the pas 50 iters
     # TODO (4): [x] Normalize the state, particularly with respect to the agents' initial positions
     # TODO (5): [x] Normalize the reward, particularly with respect to the number of agents
-    # TODO (6): [x] Add comments of every array's shape
+    # TODO (6): [ing] Add comments of every array's shape
     # TODO (7): [x] Take control of the data types! np.int32 or np.float32!
-    # TODO (8): [x] Include checking if there's a network separation
+    # TODO (8): [Pending] Include checking if there's a network separation
+    # TODO (9): [o] Implement angle WRAPPING <- not necessary as we use the relative angle and sin/cos(θ)
+    #               just added the function to the env class (wrapped_ang = self.wrap_to_pi(ang))
+    # TODO (10): [o] Configuration template
 
     def __init__(self, config):
+        """
+        :param config: dict
+        config template:
+        config = {
+            "num_agent_max": 20,  # Maximum number of agents
+            "num_agent_min": 2,  # Minimum number of agents
+
+            # Optional parameters
+            "speed": 15,  # Speed in m/s. Default is 15
+            "predefined_distance": 60,  # Predefined distance in meters. Default is 60
+            "communication_decay_rate": 1/3,  # Communication decay rate. Default is 1/3
+            "cost_weight": 1,  # Cost weight. Default is 1
+            "inter_agent_strength": 5,  # Inter agent strength. Default is 5
+            "bonding_strength": 1,  # Bonding strength. Default is 1
+            "k1": 1,  # K1 coefficient. Default is 1
+            "k2": 3,  # K2 coefficient. Default is 3
+            "max_turn_rate": 8/15,  # Maximum turn rate in rad/s. Default is 8/15
+            "initial_position_bound": 250,  # Initial position bound in meters. Default is 250
+            "dt": 0.1,  # Delta time in seconds. Default is 0.1
+            "network_topology": "fully_connected",  # Network topology. Default is "fully_connected"
+
+            # Tune the following parameters for your environment
+            "std_pos_converged": 30,  # Standard position when converged. Default is R/2
+            "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
+            "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
+            "std_vel_rate_converged": 0.01,  # Standard velocity rate when converged. Default is 0.01
+            "max_time_step": 1000  # Maximum time steps. Default is 1000,
+        }
+        """
+
         super().__init__()
 
         # Configurations
@@ -37,13 +76,17 @@ class LazyAgentsCentralized(gym.Env):
         self.k1 = self.config["k1"] if "k1" in self.config else 1
         self.k2 = self.config["k2"] if "k2" in self.config else 3
         self.u_max = self.config["max_turn_rate"] if "max_turn_rate" in self.config else 8/15  # rad/s
-        self.l_bound = self.config["initial_position_bound"] if "initial_position_bound" in self.config else 125  # m
+        self.l_bound = self.config["initial_position_bound"] if "initial_position_bound" in self.config else 250  # m
         self.dt = self.config["dt"] if "dt" in self.config else 0.1  # s
         self.net_type = self.config["network_topology"] if "network_topology" in self.config else "fully_connected"
-        self.vel_err_allowed = self.config["velocity_error_allowed"] \
-            if "velocity_error_allowed" in self.config else 0.01  # rad
-        self.pos_err_allowed = self.config["position_error_allowed"] \
-            if "position_error_allowed" in self.config else self.R  # m
+        self.std_pos_converged = self.config["std_pos_converged"] \
+            if "std_pos_converged" in self.config else self.R / 2  # m
+        self.std_vel_converged = self.config["std_vel_converged"] \
+            if "std_vel_converged" in self.config else 0.1  # m/s
+        self.std_pos_rate_converged = self.config["std_pos_rate_converged"] \
+            if "std_pos_rate_converged" in self.config else 0.1  # m
+        self.std_vel_rate_converged = self.config["std_vel_rate_converged"] \
+            if "std_vel_rate_converged" in self.config else 0.01  # m/s
         self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 1000
 
         # Define action space
@@ -73,6 +116,10 @@ class LazyAgentsCentralized(gym.Env):
         self.time_step = None
         self.clock_time = None
 
+        # Check convergence
+        self.std_pos_hist = None  # shape (self.max_time_step,)
+        self.std_vel_hist = None  # shape (self.max_time_step,)
+
     def reset(self):
         # Reset agent number
         self.num_agent = np.random.randint(self.num_agent_min, self.num_agent_max + 1)
@@ -87,7 +134,7 @@ class LazyAgentsCentralized(gym.Env):
 
         # Initialize agent states
         # (1) position: shape (num_agent_max, 2)
-        self.agent_pos = np.random.uniform(-self.l_bound, self.l_bound, (self.num_agent_max, 2))
+        self.agent_pos = np.random.uniform(-self.l_bound/2, self.l_bound/2, (self.num_agent_max, 2))
         # (2) angle: shape (num_agent_max, 1); it's a 2-D array !!!!
         self.agent_ang = np.random.uniform(-np.pi, np.pi, (self.num_agent_max, 1))
         # (3) velocity v = [vx, vy] = [v*cos(theta), v*sin(theta)]; shape (num_agent_max, 2)
@@ -104,6 +151,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get observation in a dict
         observation = self.get_observation()
+
+        # Initialize convergence check variables
+        self.std_pos_hist = np.zeros(self.max_time_step)
+        self.std_vel_hist = np.zeros(self.max_time_step)
 
         # Update time step
         self.time_step = 0
@@ -135,7 +186,7 @@ class LazyAgentsCentralized(gym.Env):
         pad_mask = self.is_padded == 1 if mask is None else mask  # Only shows padding (virtual) agents
         self.agent_pos[pad_mask, :] = 0
         self.agent_vel[pad_mask, :] = 0
-        self.agent_ang[pad_mask == 1, :] = 0
+        self.agent_ang[pad_mask, :] = 0
         self.agent_omg[pad_mask, :] = 0
 
         # Pad network topology
@@ -185,6 +236,7 @@ class LazyAgentsCentralized(gym.Env):
         # This function updates the padding from the changes in agents
         # Dim check!
         assert changes_in_agents.shape == (self.num_agent_max,)
+        assert changes_in_agents.dtype == np.int32
 
         # gain_idx = np.where(change_in_agents == 1)
         gain_mask = changes_in_agents == 1
@@ -323,7 +375,8 @@ class LazyAgentsCentralized(gym.Env):
         reward = self.compute_reward()
 
         # Check if done
-        done = True if self.is_done(mask=mask) else False
+        # done = True if self.is_done(mask=mask) else False
+        done = True if self.is_done_in_paper(mask=mask) else False
 
         # Update the clock time and the time step count
         self.clock_time += self.dt
@@ -339,7 +392,7 @@ class LazyAgentsCentralized(gym.Env):
         # Update the network topology
         #  We may lose or gain edges from the changes of the swarm.
         #  So we need to update the network topology, accordingly.
-        self.update_topology(changes_in_agents)
+        self.update_topology(changes_in_agents)  # This changes padding; be careful with silent updates (e.g. mask)
 
         # Get info
         info = {}
@@ -411,12 +464,15 @@ class LazyAgentsCentralized(gym.Env):
         # u_comm =
 
         # 5. Compute control input
-        u_local = u_cs + u_coh  #  + u_sep + u_comm  # shape: (num_agent,)
+        u_local = u_cs + u_coh  # + u_sep + u_comm  # shape: (num_agent,)
         # Saturation
         u_local = np.clip(u_local, -self.u_max, self.u_max)  # shape: (num_agent,)
         # Consider laziness
         u = np.zeros(self.num_agent_max, dtype=np.float32)  # shape: (num_agent_max,)
         u[mask] = c[mask] * u_local
+
+        # print(rel_dist[0, :].reshape(4, 5))
+        # print(rel_ang[0, :].reshape(4, 5))
 
         return u  # shape: (num_agent_max,)
 
@@ -473,6 +529,8 @@ class LazyAgentsCentralized(gym.Env):
         # (3) Update angle:
         # >>  ang_{t+1} = ang_t + w_t * dt;  Be careful: w_t is the angular velocity at time t, not t+1
         self.agent_ang[mask] = self.agent_ang[mask] + u_prev[mask, np.newaxis] * self.dt
+        # Wrap the angle to [-pi, pi]  <- not necessary, right now
+        # self.agent_ang[mask] = self.wrap_to_pi(self.agent_ang[mask])
 
         # (4) Update velocity:
         # >>  v_{t+1} = V * [cos(ang_{t+1}), sin(ang_{t+1})]; Be careful: ang_{t+1} is the angle at time t+1
@@ -521,29 +579,27 @@ class LazyAgentsCentralized(gym.Env):
 
     def is_done(self, mask=None):
         # Check if the swarm converged
-        # From paper:
+        # Mine (but paper acutally said these):
         #   (1) velocity deviation is smaller than a threshold v_th
         #   (2) position deviation is smaller than a threshold p_th
         #   (3) (independently) maximum number of time steps is reached
 
         # Get mask
-        mask = self.is_padded==0 if mask is None else mask
+        mask = self.is_padded == 0 if mask is None else mask
 
         # 1. Check velocity standard deviation
         vel_distribution = self.agent_vel[mask]  # shape: (num_agent, 2)
-        # vel_std = np.std(vel_distribution, axis=0)  # shape: (2,)
+        vel_std = np.std(vel_distribution, axis=0)  # shape: (2,)
+        vel_std = np.mean(vel_std)  # shape: (1,) or (,)
         # vel_converged = True if np.all(vel_std < self.vel_err_allowed) else False
-        vel_std = np.std(vel_distribution)  # shape: (2,)
-        vel_std = np.linalg.norm(vel_std)
-        vel_converged = True if vel_std < self.vel_err_allowed else False
+        vel_converged = True if vel_std < self.std_vel_converged else False
 
         # 2. Check position deviation
         pos_distribution = self.agent_pos[mask]  # shape: (num_agent, 2)
-        # pos_std = np.std(pos_distribution, axis=0)  # shape: (2,)
+        pos_std = np.std(pos_distribution, axis=0)  # shape: (2,)
+        pos_std = np.mean(pos_std)  # shape: (1,) or (,)
         # pos_converged = True if np.all(pos_std < self.pos_err_allowed) else False
-        pos_std = np.std(pos_distribution)  # shape: (2,)
-        pos_std = np.linalg.norm(pos_std)
-        pos_converged = True if pos_std < self.pos_err_allowed else False
+        pos_converged = True if pos_std < self.std_pos_converged else False
 
         done = True if vel_converged and pos_converged else False
 
@@ -555,6 +611,78 @@ class LazyAgentsCentralized(gym.Env):
         print(f"  vel_deviation: {vel_std},\n  pos_deviation: {pos_std},\n  done: {done}")
 
         return done
+
+    def is_done_in_paper(self, mask=None):
+        # Check if the swarm converged or the episode is done
+        # The code of the paper implemented:
+        #   (1) position std: sqrt(V(x)+V(y)) < std_p_converged
+        #   (2) change in position std: max of (sqrt(V(x)+V(y))) - min of (sqrt(V(x)+V(y))) < std_p_rate_converged
+        #       in the last 50 iterations
+        #   (3) change in velocity std: max of (sqrt(V(vx)+V(vy))) - min of (sqrt(V(vx)+V(vy))) < std_v_rate_converged
+        #       in the last 50 iterations
+        #   (4) (independently) maximum number of time steps is reached
+        # Note: if you move this method in step(), you can use self.time_step instead of self.time_step-1
+        #       Check your time_step in step() in such case
+
+        # Get mask
+        mask = self.is_padded == 0 if mask is None else mask
+        done = False
+
+        # Get standard deviations of position and velocity
+        pos_distribution = self.agent_pos[mask]  # shape: (num_agent, 2)
+        pos_std = np.sqrt(np.sum(np.var(pos_distribution, axis=0)))  # shape: (1,) or (,)
+        vel_distribution = self.agent_vel[mask]  # shape: (num_agent, 2)
+        vel_std = np.sqrt(np.sum(np.var(vel_distribution, axis=0)))  # shape: (1,) or (,)
+        # Store the standard deviations
+        self.std_pos_hist[self.time_step] = pos_std
+        self.std_vel_hist[self.time_step] = vel_std
+
+        # 1. Check position standard deviation
+        pos_converged = True if pos_std < self.std_pos_converged else False
+
+        # Check 2 and 3 only if the position standard deviation is smaller than the threshold
+        if pos_converged:
+            # 2. Check change in position standard deviation
+            # Get the last 50 iterations
+            last_n_pos_std = self.std_pos_hist[self.time_step - 50 : self.time_step + 1]
+            # Get the maximum and minimum of the last 50 iterations
+            max_last_n_pos_std = np.max(last_n_pos_std)
+            min_last_n_pos_std = np.min(last_n_pos_std)
+            # Check if the change in position standard deviation is smaller than the threshold
+            pos_rate_converged = \
+                True if (max_last_n_pos_std-min_last_n_pos_std) < self.std_pos_rate_converged else False
+
+            # Check 3 only if the change in position standard deviation is smaller than the threshold
+            if pos_rate_converged:
+                # 3. Check change in velocity standard deviation
+                # Get the last 50 iterations
+                last_n_vel_std = self.std_vel_hist[self.time_step - 50 : self.time_step + 1]
+                # Get the maximum and minimum of the last 50 iterations
+                max_last_n_vel_std = np.max(last_n_vel_std)
+                min_last_n_vel_std = np.min(last_n_vel_std)
+                # Check if the change in velocity standard deviation is smaller than the threshold
+                vel_rate_converged = \
+                    True if (max_last_n_vel_std-min_last_n_vel_std) < self.std_vel_rate_converged else False
+                # Check if the swarm converged in the sense of std_pos, std_pos_rate, and std_vel_rate
+                done = vel_rate_converged
+
+        # 4. Check if the maximum number of time steps is reached
+        if self.time_step >= self.max_time_step-1:
+            done = True
+
+        # Print
+        print(f"time_step: {self.time_step}, max_time_step: {self.max_time_step}")
+        print(f"      pos_std: {pos_std},\n"
+              f"      vel_std: {vel_std},\n"
+              # f"      pos_rate_deviation: {max_last_n_pos_std-min_last_n_pos_std},\n"
+              # f"      vel_rate_deviation: {max_last_n_vel_std-min_last_n_vel_std},\n"
+              f"      done: {done}")
+
+        return done
+
+    def wrap_to_pi(self, angles):
+        # Wrap angles to [-pi, pi]
+        return (angles + np.pi) % (2 * np.pi) - np.pi
 
     def render(self, mode="human"):
         # Render the environment
