@@ -47,10 +47,10 @@ class LazyAgentsCentralized(gym.Env):
             "network_topology": "fully_connected",  # Network topology. Default is "fully_connected"
 
             # Tune the following parameters for your environment
-            "std_pos_converged": 30,  # Standard position when converged. Default is R/2
+            "std_pos_converged": 45,  # Standard position when converged. Default is 0.7*R
             "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
             "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
-            "std_vel_rate_converged": 0.01,  # Standard velocity rate when converged. Default is 0.01
+            "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
             "max_time_step": 1000  # Maximum time steps. Default is 1000,
         }
         """
@@ -80,7 +80,8 @@ class LazyAgentsCentralized(gym.Env):
         self.dt = self.config["dt"] if "dt" in self.config else 0.1  # s
         self.net_type = self.config["network_topology"] if "network_topology" in self.config else "fully_connected"
         self.std_pos_converged = self.config["std_pos_converged"] \
-            if "std_pos_converged" in self.config else self.R / 2  # m
+            if "std_pos_converged" in self.config else 0.7*self.R  # m
+        # Note: if we use std(x)+std(y), it goes to 1.0*R; but we use sqrt(V(x)+V(y)). So, it goes to 0.7*R
         self.std_vel_converged = self.config["std_vel_converged"] \
             if "std_vel_converged" in self.config else 0.1  # m/s
         self.std_pos_rate_converged = self.config["std_pos_rate_converged"] \
@@ -567,10 +568,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Compute reward of all agents into a scalar: centralized
         # control_cost = (self.v / self.num_agent) * np.sum(u_t ** 2)
-        control_cost = (self.v / self.num_agent) * np.sum(np.abs(u_t))  # from the paper
-        fuel_cost = self.rho * self.dt
+        control_cost = self.dt * (self.v / self.num_agent) * np.sum(np.abs(u_t))  # from the paper
+        fuel_cost = self.dt
         # Shape of reward: (1,)  TODO: check the data types!
-        reward = control_cost + fuel_cost
+        reward = control_cost + self.rho * fuel_cost
 
         # Check the dimension of reward
         assert reward.shape == ()  # TODO: delete this line as well, l8r
@@ -642,41 +643,43 @@ class LazyAgentsCentralized(gym.Env):
 
         # Check 2 and 3 only if the position standard deviation is smaller than the threshold
         if pos_converged:
-            # 2. Check change in position standard deviation
-            # Get the last 50 iterations
-            last_n_pos_std = self.std_pos_hist[self.time_step - 50 : self.time_step + 1]
-            # Get the maximum and minimum of the last 50 iterations
-            max_last_n_pos_std = np.max(last_n_pos_std)
-            min_last_n_pos_std = np.min(last_n_pos_std)
-            # Check if the change in position standard deviation is smaller than the threshold
-            pos_rate_converged = \
-                True if (max_last_n_pos_std-min_last_n_pos_std) < self.std_pos_rate_converged else False
-
-            # Check 3 only if the change in position standard deviation is smaller than the threshold
-            if pos_rate_converged:
-                # 3. Check change in velocity standard deviation
+            # Only proceed if there have been at least 50 time steps
+            if self.time_step >= 49:
+                # 2. Check change in position standard deviation
                 # Get the last 50 iterations
-                last_n_vel_std = self.std_vel_hist[self.time_step - 50 : self.time_step + 1]
+                last_n_pos_std = self.std_pos_hist[self.time_step - 49 : self.time_step + 1]
                 # Get the maximum and minimum of the last 50 iterations
-                max_last_n_vel_std = np.max(last_n_vel_std)
-                min_last_n_vel_std = np.min(last_n_vel_std)
-                # Check if the change in velocity standard deviation is smaller than the threshold
-                vel_rate_converged = \
-                    True if (max_last_n_vel_std-min_last_n_vel_std) < self.std_vel_rate_converged else False
-                # Check if the swarm converged in the sense of std_pos, std_pos_rate, and std_vel_rate
-                done = vel_rate_converged
+                max_last_n_pos_std = np.max(last_n_pos_std)
+                min_last_n_pos_std = np.min(last_n_pos_std)
+                # Check if the change in position standard deviation is smaller than the threshold
+                pos_rate_converged = \
+                    True if (max_last_n_pos_std-min_last_n_pos_std) < self.std_pos_rate_converged else False
+
+                # Check 3 only if the change in position standard deviation is smaller than the threshold
+                if pos_rate_converged:
+                    # 3. Check change in velocity standard deviation
+                    # Get the last 50 iterations
+                    last_n_vel_std = self.std_vel_hist[self.time_step - 49 : self.time_step + 1]
+                    # Get the maximum and minimum of the last 50 iterations
+                    max_last_n_vel_std = np.max(last_n_vel_std)
+                    min_last_n_vel_std = np.min(last_n_vel_std)
+                    # Check if the change in velocity standard deviation is smaller than the threshold
+                    vel_rate_converged = \
+                        True if (max_last_n_vel_std-min_last_n_vel_std) < self.std_vel_rate_converged else False
+                    # Check if the swarm converged in the sense of std_pos, std_pos_rate, and std_vel_rate
+                    done = vel_rate_converged
 
         # 4. Check if the maximum number of time steps is reached
         if self.time_step >= self.max_time_step-1:
             done = True
 
-        # Print
-        print(f"time_step: {self.time_step}, max_time_step: {self.max_time_step}")
-        print(f"      pos_std: {pos_std},\n"
-              f"      vel_std: {vel_std},\n"
-              # f"      pos_rate_deviation: {max_last_n_pos_std-min_last_n_pos_std},\n"
-              # f"      vel_rate_deviation: {max_last_n_vel_std-min_last_n_vel_std},\n"
-              f"      done: {done}")
+        # # Print
+        # print(f"time_step: {self.time_step}, max_time_step: {self.max_time_step}")
+        # print(f"      pos_std: {pos_std},\n"
+        #       f"      vel_std: {vel_std},\n"
+        #       # f"      pos_rate_deviation: {max_last_n_pos_std-min_last_n_pos_std},\n"
+        #       # f"      vel_rate_deviation: {max_last_n_vel_std-min_last_n_vel_std},\n"
+        #       f"      done: {done}")
 
         return done
 
