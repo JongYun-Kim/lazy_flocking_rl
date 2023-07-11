@@ -1,7 +1,7 @@
 import gym
 from gym.spaces import Box, Dict
 import numpy as np
-from sl_pso import SLPSO as meta_optimizer
+# from sl_pso import SLPSO as meta_optimizer
 
 
 class LazyAgentsCentralized(gym.Env):
@@ -87,12 +87,13 @@ class LazyAgentsCentralized(gym.Env):
         self.std_pos_rate_converged = self.config["std_pos_rate_converged"] \
             if "std_pos_rate_converged" in self.config else 0.1  # m
         self.std_vel_rate_converged = self.config["std_vel_rate_converged"] \
-            if "std_vel_rate_converged" in self.config else 0.01  # m/s
+            if "std_vel_rate_converged" in self.config else 0.2  # m/s
         self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 1000
 
         # Define action space
         # Laziness vector; padding included
         # TODO: continuous actions? VS discrete actions?
+        #       If continuous, what's the action distribution?
         self.action_space = Box(low=0, high=1, shape=(self.num_agent_max,), dtype=np.float32)
 
         # Define observation space
@@ -342,7 +343,9 @@ class LazyAgentsCentralized(gym.Env):
 
         return adj_mat  # a copy of the adjacency matrix; not linked to the original object (i.e. self.adjacency_matrix)
 
-    def step(self, action):
+    def step(self,
+             action: np.ndarray,
+             ):
         # Note: action is not used as control input;
         #       it is used to weight the control input (i.e. laziness)
 
@@ -407,7 +410,7 @@ class LazyAgentsCentralized(gym.Env):
         mask = self.is_padded == 0 if mask is None else mask
         assert c.shape == mask.shape
         assert c.shape == (self.num_agent_max,)
-        assert c.dtype == np.float32
+        # assert c.dtype == np.float32  # TODO: c comes from outer scope; so it may not be float32; astype???
         assert mask.dtype == np.bool
         assert np.sum(mask) == self.num_agent  # TODO: remove the asserts once the code is stable
 
@@ -571,10 +574,11 @@ class LazyAgentsCentralized(gym.Env):
         control_cost = self.dt * (self.v / self.num_agent) * np.sum(np.abs(u_t))  # from the paper
         fuel_cost = self.dt
         # Shape of reward: (1,)  TODO: check the data types!
-        reward = control_cost + self.rho * fuel_cost
+        total_cost = control_cost + self.rho * fuel_cost
+        reward = - total_cost  # maximize the reward == minimize the cost
 
-        # Check the dimension of reward
-        assert reward.shape == ()  # TODO: delete this line as well, l8r
+        # Check the data type of the reward
+        assert isinstance(reward, float) or isinstance(reward, np.float32)  # TODO: delete this line as well, l8r
 
         return reward
 
