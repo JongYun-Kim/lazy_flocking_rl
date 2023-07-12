@@ -1,7 +1,7 @@
 import gym
 from gym.spaces import Box, Dict
 import numpy as np
-# from sl_pso import SLPSO as meta_optimizer
+# from utils.metaheuristics import SLPSO as PSO
 
 
 class LazyAgentsCentralized(gym.Env):
@@ -23,6 +23,7 @@ class LazyAgentsCentralized(gym.Env):
     # TODO (9): [o] Implement angle WRAPPING <- not necessary as we use the relative angle and sin/cos(θ)
     #               just added the function to the env class (wrapped_ang = self.wrap_to_pi(ang))
     # TODO (10): [o] Configuration template
+    # TODO (11): [o] Allow auto_step as well as the norminal step, one_step
 
     def __init__(self, config):
         """
@@ -52,6 +53,9 @@ class LazyAgentsCentralized(gym.Env):
             "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
             "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
             "max_time_step": 1000  # Maximum time steps. Default is 1000,
+
+            # Step mode
+            "auto_step": False  # If True, the env will step automatically (i.e. episode length==1). Default is False
         }
         """
 
@@ -89,6 +93,7 @@ class LazyAgentsCentralized(gym.Env):
         self.std_vel_rate_converged = self.config["std_vel_rate_converged"] \
             if "std_vel_rate_converged" in self.config else 0.2  # m/s
         self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 1000
+        self.do_auto_step = self.config["auto_step"] if "auto_step" in self.config else False
 
         # Define action space
         # Laziness vector; padding included
@@ -346,6 +351,32 @@ class LazyAgentsCentralized(gym.Env):
     def step(self,
              action: np.ndarray,
              ):
+        if self.do_auto_step:
+            obs, reward, done, info = self.auto_step(action)
+        else:
+            obs, reward, done, info = self.single_step(action)
+
+        return obs, reward, done, info
+
+    def auto_step(self,
+                  action: np.ndarray,
+                  ):
+        # The given action is continuously used in all single_step calls until the episode is done.
+
+        obs = self.get_observation()
+        episode_reward = 0
+        done = False
+        info = {}
+        constant_action = action
+        while not done:
+            obs, reward, done, info = self.single_step(constant_action)
+            episode_reward += reward
+
+        return obs, episode_reward, done, info
+
+    def single_step(self,
+                    action: np.ndarray,
+                    ):
         # Note: action is not used as control input;
         #       it is used to weight the control input (i.e. laziness)
 
