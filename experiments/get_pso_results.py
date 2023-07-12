@@ -1,0 +1,116 @@
+import numpy as np
+from env.envs import LazyAgentsCentralized
+from utils.metaheuristics import GetLazinessBySLPSO
+import copy
+import ray
+import pickle
+import os
+from datetime import datetime
+
+
+if __name__ == '__main__':
+    # Params
+    num_agent = 20  # Fixed number of agents
+    num_experiments = 25  # Number of experiments
+    num_cpus = 14  # Number of CPUs to use for parallelization by Ray
+
+
+    # Get a config dict for the test environment
+    config = {
+        "num_agent_max": num_agent,  # Maximum number of agents
+        "num_agent_min": num_agent,  # Minimum number of agents
+
+        # Optional parameters
+        "speed": 15,  # Speed in m/s. Default is 15
+        "predefined_distance": 60,  # Predefined distance in meters. Default is 60
+        "communication_decay_rate": 1/3,  # Communication decay rate. Default is 1/3
+        "cost_weight": 1,  # Cost weight. Default is 1
+        "inter_agent_strength": 5,  # Inter agent strength. Default is 5
+        "bonding_strength": 1,  # Bonding strength. Default is 1
+        "k1": 1,  # K1 coefficient. Default is 1
+        "k2": 3,  # K2 coefficient. Default is 3
+        "max_turn_rate": 8 / 15,  # Maximum turn rate in rad/s. Default is 8/15
+        "initial_position_bound": 250,  # Initial position bound in meters. Default is 250
+        "dt": 0.1,  # Delta time in seconds. Default is 0.1
+        "network_topology": "fully_connected",  # Network topology. Default is "fully_connected"
+
+        # Tune the following parameters for your environment
+        "std_pos_converged": 45,  # Standard position when converged. Default is 0.7*R
+        "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
+        "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
+        "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
+        "max_time_step": 1000  # Maximum time steps. Default is 1000,
+    }
+
+    # Initialize ray
+    #   : pso.compute_single_particle_cost used as a remote function in pso._cost_func()
+    ray.init(num_cpus=num_cpus)
+
+    # For storing results
+    results = []
+
+    for exp in range(num_experiments):
+        # Create environment
+        env = LazyAgentsCentralized(config)
+        env.reset()
+
+        pso = GetLazinessBySLPSO()
+        pso.set_env(copy.deepcopy(env))
+        laziness, cost, _ = pso.run(see_updates=True, see_time=True)
+
+        print(f"\nExperiment {exp + 1}/{num_experiments}")
+        print("Laziness: ", laziness)
+        print("Cost: ", cost)
+
+        # Append environment and results to results list
+        results.append({"env": env, "laziness": laziness, "cost": cost})
+
+    # Get current date and time
+    current_directory = os.path.dirname(os.path.abspath(__file__))  # current directory where the script is located
+    base_directory = os.path.dirname(current_directory)  # get the parent directory
+    data_directory = os.path.join(base_directory, "data")  # data directory is in the base directory
+    now = datetime.now()
+    date_time = now.strftime("%y_%m_%d_%H%M")
+    path_to_create = os.path.join(data_directory, date_time)
+
+    # Create directory with date and time as name
+    os.makedirs(path_to_create, exist_ok=True)
+
+    # Save results to a pickle file
+    file_path = os.path.join(path_to_create, "results.pkl")
+    with open(file_path, "wb") as f:  # wb stands for write binary
+        pickle.dump({"results": results, "config": config}, f)  # dump the results and config to the pickle file
+
+    print("Done!")
+
+    ray.shutdown()
+    print("Ray shutdown!")
+
+""" How to use the results l8r
+import pickle
+import os
+
+# Get the path to the pickle file; please update the path accordingly
+data_path = "./data"  # Get your data path
+folder_name = "23_01_01_0000"
+file_name = "results.pkl"
+path_to_read = os.path.join(data_path, folder_name, file_name)
+
+# Load the pickle file
+with open(path_to_read, "rb") as f:
+    data = pickle.load(f)
+
+# Get the results and config
+results = data["results"]
+config = data["config"]
+
+# Now you can access the results
+# For example, results[i]["laziness"] gives the laziness of the i-th experiment (i starts from 0)
+for result in results:
+    print("Laziness: ", result["laziness"])
+    print("Cost: ", result["cost"])
+    print("Environment: ", result["env"])
+
+# And you can access the config
+print("Config: ", config)
+"""
