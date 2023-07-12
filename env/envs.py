@@ -524,6 +524,10 @@ class LazyAgentsCentralized(gym.Env):
         # Update the state based on the control input
         # (1) Update angular velocity:
         # >>  w_{t+1} = u_{t+1}
+        self.agent_omg = np.copy(self.agent_omg)  # TODO: testing.. ray
+        self.agent_pos = np.copy(self.agent_pos)  # TODO: testing.. ray
+        self.agent_ang = np.copy(self.agent_ang)  # TODO: testing.. ray
+        self.agent_vel = np.copy(self.agent_vel)  # TODO: testing.. ray
         self.agent_omg[mask] = u[mask, np.newaxis]
 
         # (2) Update position:
@@ -639,6 +643,8 @@ class LazyAgentsCentralized(gym.Env):
         vel_distribution = self.agent_vel[mask]  # shape: (num_agent, 2)
         vel_std = np.sqrt(np.sum(np.var(vel_distribution, axis=0)))  # shape: (1,) or (,)
         # Store the standard deviations
+        self.std_pos_hist = np.copy(self.std_pos_hist)  # TODO: ray...
+        self.std_vel_hist = np.copy(self.std_vel_hist)  # TODO: ray...
         self.std_pos_hist[self.time_step] = pos_std
         self.std_vel_hist[self.time_step] = vel_std
 
