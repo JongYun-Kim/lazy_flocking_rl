@@ -3,6 +3,7 @@ import time
 from env.envs import LazyAgentsCentralized  # Import your custom environment
 import copy
 import gym
+import ray
 
 
 class SLPSO:
@@ -151,7 +152,7 @@ class SLPSO:
 
             if see_time:
                 print(f"\nTime elapsed: {time.time() - start_time}")
-                print(f"    Progress: {num_fit_eval/maxfe*100}%")
+                print(f"    Progress: {num_fit_eval/maxfe*100:.2f}%")
             if see_updates:
                 print(f"Generation: {gen}")
                 print(f"    Best cost: {best_cost_ever}")
@@ -178,6 +179,9 @@ class GetLazinessBySLPSO(SLPSO):
         super().__init__()
 
         self.env_original = None
+
+        # Initialize Ray
+        ray.init(num_cpus=14)
 
     def set_env(self, env_initialized):
         """
@@ -229,20 +233,37 @@ class GetLazinessBySLPSO(SLPSO):
         """
         m = p.shape[0]
         # d = p.shape[1]
-        cost = np.zeros(m, dtype=np.float32)
+        cost_futures = []
 
-        # For each particle, evaluate the reward_sum
+        # For each particle, evaluate the reward_sum in parallel using Ray
         for i in range(m):
             env = copy.deepcopy(self.env_original)
-            reward_sum = 0
-            done = False
-            constant_action = p[i, :]  # shape: (d, ); laziness vector
-            while not done:
-                _, reward, done, _ = env.step(constant_action)
-                reward_sum += reward  # a scalar
-            cost[i] = - reward_sum  # cost of i-th particle is the negative reward_sum of the episode
+            p_in = p[i, :]
+            cost_future = self.compute_single_particle_cost.remote(env=env, p=p_in)
+            cost_futures.append(cost_future)
 
-        return cost  # shape: (m, )
+        # Get the costs from the futures
+        costs_got = ray.get(cost_futures)
+
+        costs = np.array(costs_got, dtype=np.float32)  # shape: (m, )
+
+        assert costs.shape == (m, ), "costs.shape should be (m, )"
+        assert isinstance(costs, np.ndarray), "costs should be a numpy array"
+
+        return costs
+
+    @staticmethod
+    @ray.remote
+    def compute_single_particle_cost(env, p):
+        reward_sum = 0
+        done = False
+        constant_action = p  # laziness vector
+        while not done:
+            _, reward, done, _ = env.step(constant_action)
+            reward_sum += reward  # a scalar
+        cost = - reward_sum  # cost of i-th particle is the negative reward_sum of the episode
+
+        return cost
 
 
 def cost_func(p):
