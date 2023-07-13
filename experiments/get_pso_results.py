@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 from env.envs import LazyAgentsCentralized
 from utils.metaheuristics import GetLazinessBySLPSO
 import copy
@@ -11,9 +11,11 @@ from datetime import datetime
 if __name__ == '__main__':
     # Params
     num_agent = 20  # Fixed number of agents
-    num_experiments = 25  # Number of experiments
+    num_experiments = 1  # Number of experiments
     num_cpus = 14  # Number of CPUs to use for parallelization by Ray
 
+    # Get start time
+    start_time = datetime.now()
 
     # Get a config dict for the test environment
     config = {
@@ -81,10 +83,27 @@ if __name__ == '__main__':
     with open(file_path, "wb") as f:  # wb stands for write binary
         pickle.dump({"results": results, "config": config}, f)  # dump the results and config to the pickle file
 
-    print("Done!")
+    # Print the path to the pickle file
+    print(f"\nData collection completed at", now.strftime("%Y-%m-%d %H:%M:%S"))
+    print(f"Results are saved to {file_path}")
+
+    # Tell the duration of the experiment
+    end_time = now
+    duration = end_time - start_time
+    seconds = int(duration.total_seconds())
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+
+    is_plural = lambda x: '' if x == 1 else 's'  # for printing plural forms
+
+    print("\nIt took {} day{}, {} hour{}, {} minute{}, and {} second{}".format(days, is_plural(days), hours,
+                                                                               is_plural(hours), minutes,
+                                                                               is_plural(minutes), seconds,
+                                                                               is_plural(seconds)))
 
     ray.shutdown()
-    print("Ray shutdown!")
+    print("\n\nRay shutdown!")
 
 """ How to use the results l8r
 import pickle
