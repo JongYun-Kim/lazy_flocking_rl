@@ -23,8 +23,10 @@ class SLPSO:
         self.d = None
         self.M = None
         self.lu = None
+        self.stagnation_counter = None
+        self.max_stagnation = None
 
-    def reset(self, cost_func, d, low, high=None,  M=None):
+    def reset(self, cost_func, d, low, high=None,  M=None, max_stagnation=50):
         """
         :param cost_func: (callable) cost function; Or None if you define your custom cost function as a method
                 input: particles (np.array); shape: (m, d)
@@ -33,22 +35,28 @@ class SLPSO:
         :param low: (np.array) lower bound of the problem; shape: (d, )
         :param high: (np.array) upper bound of the problem; shape: (d, )
         :param M: (int) base population size
+        :param max_stagnation: (int) maximum stagnation counter (generations) before early termination (default: 100)
         """
         if self.require_reset:
             # Check inputs
             self.cost_func = cost_func
-            self._check_inputs(d, low, high, M)
-
+            self._check_inputs(d, low, high, M, max_stagnation)
             # Set bounds
             self.lu = np.array([low, high], dtype=np.float32)
-
+            # Set dimension
             self.d = d
+            # Set base population size
             self.M = M if M is not None else 100
+            # Set stagnation counter
+            self.stagnation_counter = 0
+            # Set maximum stagnation
+            self.max_stagnation = max_stagnation
+
             self.require_reset = False
         else:
             raise Exception("Your problem is not ready for. Probably it's in the middle of the optimization process")
 
-    def _check_inputs(self, d, low, high, M):
+    def _check_inputs(self, d, low, high, M, max_stagnation):
         # Check if cost_func is callable
         if self.cost_func is not None:
             assert callable(self.cost_func), "The cost function should be callable"
@@ -70,6 +78,9 @@ class SLPSO:
 
         # Check if M is a positive integer
         assert M > 0, "The base population size should be greater than 0"
+
+        # Check if max_stagnation is a positive integer
+        assert max_stagnation > 0, "The maximum stagnation should be greater than 0"
 
     def run(self, see_time=False, see_updates=False, maxfe=None):
         if self.require_reset:
@@ -112,10 +123,17 @@ class SLPSO:
             v = v[rank, :]
 
             # Update best cost and position
+            old_best_cost = best_cost_ever
             best_y = fitness[m-1]
             best_p = p[m-1, :]
-            best_p_ever = best_p if best_y < best_cost_ever else best_p_ever
-            best_cost_ever = min(best_y, best_cost_ever)
+            if best_y < best_cost_ever:
+                best_cost_ever = best_y
+                best_p_ever = best_p
+                self.stagnation_counter = 0
+            else:
+                self.stagnation_counter += 1
+                if self.stagnation_counter >= self.max_stagnation:
+                    break  # early termination
 
             # Center position
             center = np.ones((m, 1)) * np.mean(p, axis=0)
@@ -150,15 +168,19 @@ class SLPSO:
             num_fit_eval = num_fit_eval + m - 1  # best particle not evaluated
             gen += 1
 
-            if see_time:
-                print(f"\nTime elapsed: {time.time() - start_time}")
-                print(f"    Progress: {num_fit_eval/maxfe*100:.2f}%")
+            # Print the results
             if see_updates:
-                print(f"Generation: {gen}")
+                print(f"\nGeneration: {gen}")
                 print(f"    Best cost: {best_cost_ever}")
                 print(f"    Best position: {best_p_ever}")
+            if see_time:
+                print(f"Time elapsed: {time.time() - start_time:.1f} s")
+                print(f"    Progress: {num_fit_eval / maxfe * 100:.2f}%")
 
         self.require_reset = True
+
+        # Reset the stagnation counter
+        self.stagnation_counter = 0
 
         return best_p_ever, best_cost_ever
 
@@ -173,15 +195,15 @@ class SLPSO:
 
 class GetLazinessBySLPSO(SLPSO):
     """
-    This class is used to get the laziness vector by using SLPSO
+    This class is used to get the (sub-)optimal laziness vector by using SLPSO
     """
     def __init__(self):
         super().__init__()
 
         self.env_original = None
 
-        # Initialize Ray
-        ray.init(num_cpus=14)
+        # # Initialize Ray
+        # ray.init(num_cpus=14, ignore_reinit_error=True)
 
     def set_env(self, env_initialized):
         """
@@ -202,9 +224,10 @@ class GetLazinessBySLPSO(SLPSO):
         low = np.zeros(d, dtype=np.float32)
         high = np.ones(d, dtype=np.float32)
         M = 100
+        max_stagnation = 20  # 50
 
         # Reset the class with super's reset() method
-        super().reset(cost_func=None, d=d, low=low, high=high,  M=M)
+        super().reset(cost_func=None, d=d, low=low, high=high,  M=M, max_stagnation=max_stagnation)
 
     def run(self, see_updates=False, see_time=False, maxfe=None):
         """
@@ -255,6 +278,7 @@ class GetLazinessBySLPSO(SLPSO):
     @staticmethod
     @ray.remote
     def compute_single_particle_cost(env, p):
+        # TODO: You can use env.auto_step() to get the reward_sum without using the while loop
         reward_sum = 0
         done = False
         constant_action = p  # laziness vector
