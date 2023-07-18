@@ -85,10 +85,11 @@ def plot_std_history(std_vel_history, std_pos_history, fig, ax):
 if __name__ == '__main__':
     print("Running env_test.py")
 
-    cases = [10, 15, 20, 25, 30]
+    # cases = [10, 15, 20, 25, 30]
+    cases = [20]
     mum_cases = len(cases)
 
-    num_experiment = 10
+    num_experiment = 100
 
     result_average_converged_time = np.zeros((mum_cases, num_experiment))
 
@@ -96,10 +97,10 @@ if __name__ == '__main__':
 
         for exp in range(num_experiment):
 
-            num_agent = cases[case]
-            action = np.ones(num_agent, dtype=np.float32)
-            config = {"num_agent_max": num_agent,
-                      "num_agent_min": num_agent,
+            num_agents = cases[case]
+            action = np.ones(num_agents, dtype=np.float32)
+            config = {"num_agents_max": num_agents,
+                      "num_agents_min": num_agents,
                       #
                       # Optional parameters
                       "speed": 15,  # Speed in m/s. Default is 15
@@ -129,7 +130,7 @@ if __name__ == '__main__':
 
             # std_vel_history = []
             # std_pos_history = []
-            # agent_positions_history = np.zeros((num_agent, env.max_time_step, 2), dtype=np.float32)
+            agent_positions_history = np.zeros((num_agents, env.max_time_step, 2), dtype=np.float32)
 
             # fig1, ax1 = plt.subplots()
             # fig2, ax2 = plt.subplots()
@@ -139,13 +140,13 @@ if __name__ == '__main__':
             while not done:
                 obs, reward, done, info = env.step(action)
 
-                # Get the reward
+                # # Get the reward
                 # reward_sum += reward
-
-                # extract agent_states from the observations
+                #
+                # # extract agent_states from the observations
                 # agent_states = obs['agent_embeddings']
-
-                # update agent_positions_history with current positions
+                #
+                # # update agent_positions_history with current positions
                 # agent_positions_history[:, env.time_step-1] = agent_states[:, :2]
 
                 # # plot trajectories and std dev history
@@ -160,13 +161,13 @@ if __name__ == '__main__':
                 #     print(f"Time step: {env.time_step}")
                 #     time.sleep(0.01)
 
-            # plot trajectories and std dev history
+            # # plot trajectories and std dev history
             # std_pos_history = env.std_pos_hist[:env.time_step]
             # std_vel_history = env.std_vel_hist[:env.time_step]
             # plot_agents(agent_states, fig1, ax1)
             # plot_std_history(std_vel_history, std_pos_history, fig2, ax2)
             # plot_trajectories(agent_positions_history[:, :env.time_step], agent_states, fig3, ax3)
-
+            #
             # std = np.std(agent_states[:, :2], axis=0).sum()
             # print(f"Final std_mine: {std}")
             # print(f"Accumulated reward: {reward_sum}")
@@ -177,11 +178,11 @@ if __name__ == '__main__':
             if env.time_step == env.max_time_step:
                 print("Max time step reached!")
 
+            result_average_converged_time[case, exp] = env.time_step
+
             # plt.close(fig1)
             # plt.close(fig2)
             # plt.close(fig3)
-
-            result_average_converged_time[case, exp] = env.time_step
 
 
     # # plot the average converged time

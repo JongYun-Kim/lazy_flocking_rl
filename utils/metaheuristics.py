@@ -215,12 +215,12 @@ class GetLazinessBySLPSO(SLPSO):
         # Check if env_initialized is LazyAgentsCentralized class
         if not isinstance(env_initialized, LazyAgentsCentralized):
             raise TypeError("env_initialized should be LazyAgentsCentralized class")
-        assert env_initialized.num_agent is not None, "num_agent should be initialized"
+        assert env_initialized.num_agents is not None, "num_agents should be initialized"
 
         # Store the initialized environment and use it in the cost function by using deepcopy
         self.env_original = env_initialized
-        d = env_initialized.num_agent  # TODO: if you use num_agent, you should pad the laziness vector with 0s
-        # d = env_initialized.num_agent_max
+        d = env_initialized.num_agents  # TODO: if you use num_agents, you should pad the laziness vector with 0s
+        # d = env_initialized.num_agents_max
         low = np.zeros(d, dtype=np.float32)
         high = np.ones(d, dtype=np.float32)
         M = 100
@@ -241,8 +241,8 @@ class GetLazinessBySLPSO(SLPSO):
         # Extend the laziness vector to the maximum number of agents
         mask = self.env_original.is_padded == 0
         # Fill the solution with 0s
-        best_laziness_full = np.zeros(self.env_original.num_agent_max, dtype=np.float32)
-        # best_laziness_full: shape: (D, ); D: maximum number of agents == self.env_original.num_agent_max
+        best_laziness_full = np.zeros(self.env_original.num_agents_max, dtype=np.float32)
+        # best_laziness_full: shape: (D, ); D: maximum number of agents == self.env_original.num_agents_max
         best_laziness_full[mask] = best_laziness_small
 
         return best_laziness_full, best_cost, best_laziness_small
@@ -279,6 +279,8 @@ class GetLazinessBySLPSO(SLPSO):
     @ray.remote
     def compute_single_particle_cost(env, p):
         # TODO: You can use env.auto_step() to get the reward_sum without using the while loop
+        assert env.use_custom_ray is True, "env.use_custom_ray should be True for parallel computing (immutable env)"
+
         reward_sum = 0
         done = False
         constant_action = p  # laziness vector

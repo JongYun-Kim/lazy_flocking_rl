@@ -1,17 +1,17 @@
 # import numpy as np
-from env.envs import LazyAgentsCentralized
-from utils.metaheuristics import GetLazinessBySLPSO
-import copy
-import ray
-import pickle
-import os
-from datetime import datetime
+from env.envs import LazyAgentsCentralized  # environment
+from utils.metaheuristics import GetLazinessBySLPSO  # optimizer
+import copy  # for preserving the environment object in the results for later use
+import ray  # for parallelization
+import pickle  # for saving results
+import os  # for creating directories
+from datetime import datetime  # for getting current date and time
 
 
 if __name__ == '__main__':
     # Params
-    num_agent = 20  # Fixed number of agents
-    num_experiments = 1  # Number of experiments
+    num_agents = 20  # Fixed number of agents
+    num_experiments = 30  # Number of experiments
     num_cpus = 14  # Number of CPUs to use for parallelization by Ray
 
     # Get start time
@@ -19,8 +19,8 @@ if __name__ == '__main__':
 
     # Get a config dict for the test environment
     config = {
-        "num_agent_max": num_agent,  # Maximum number of agents
-        "num_agent_min": num_agent,  # Minimum number of agents
+        "num_agents_max": num_agents,  # Maximum number of agents
+        "num_agents_min": num_agents,  # Minimum number of agents
 
         # Optional parameters
         "speed": 15,  # Speed in m/s. Default is 15
@@ -41,7 +41,13 @@ if __name__ == '__main__':
         "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
         "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
         "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
-        "max_time_step": 1000  # Maximum time steps. Default is 1000,
+        "max_time_step": 1000,  # Maximum time steps. Default is 1000,
+
+        # Step mode
+        "auto_step": False,  # If True, the env will step automatically (i.e. episode length==1). Default: False
+
+        # Ray config
+        "use_custom_ray": True,  # If True, immutability of the env will be ensured. Default: False
     }
 
     # Initialize ray
@@ -104,6 +110,7 @@ if __name__ == '__main__':
 
     ray.shutdown()
     print("\n\nRay shutdown!")
+    print("\nDone")
 
 """ How to use the results l8r
 import pickle
