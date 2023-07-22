@@ -7,16 +7,17 @@ import ray
 
 
 class SLPSO:
-
     # TODO (1): [Canceled] Could do better with the initialization
     #   TODO (1-1) [Canceled] unify problem instances with the cost function e.g. cost_func returns configs as well
     # TODO (2): [x] Think about validity of the seed generation method (current resoultion is 1ms)
     # TODO (3): [o] Use both lower and upper bounds (update
     # TODO (4): [Canceled] Set default bounds to infinities
-    # TODO (5): [x] Consider early termination
+    # TODO (5): [o] Consider early termination
     # TODO (6): [Canceled] Consider parallelization with multiple cost functions <- parallelize it in the outer scope
     # TODO (7): [o] Create _cost_func as a method of the class (internal use of the cost function)
     # TODO (8): [o] Validate the inputs
+    # TODO (9): [x] Create callbacks for customizations for particle initialization, early termination, etc.
+
     def __init__(self):
         self.require_reset = True
         self.cost_func = None
@@ -25,10 +26,17 @@ class SLPSO:
         self.lu = None
         self.stagnation_counter = None
         self.max_stagnation = None
+        self._do_custom__particle_initializer = False
 
-    def reset(self, cost_func, d, low, high=None,  M=None, max_stagnation=50):
+    def reset(self,
+              cost_func_: callable,
+              d: int,
+              high,
+              low=None,
+              M=None,
+              max_stagnation=50):
         """
-        :param cost_func: (callable) cost function; Or None if you define your custom cost function as a method
+        :param cost_func_: (callable) cost function; Or None if you define your custom cost function as a method
                 input: particles (np.array); shape: (m, d)
                 output: fitness (np.array); shape: (m, )
         :param d: (int) dimension of the problem
@@ -39,7 +47,8 @@ class SLPSO:
         """
         if self.require_reset:
             # Check inputs
-            self.cost_func = cost_func
+            self.cost_func = cost_func_
+            low = -high if low is None else low
             self._check_inputs(d, low, high, M, max_stagnation)
             # Set bounds
             self.lu = np.array([low, high], dtype=np.float32)
@@ -105,6 +114,7 @@ class SLPSO:
         XRRmax = np.tile(self.lu[1, :], (m, 1))
         np.random.seed(int(time.time()*1000) % (2**32))
         p = XRRmin + (XRRmax - XRRmin) * np.random.rand(m, self.d)  # dtype: np.float64
+        p = self._custom_particle_initializer(p) if self._do_custom__particle_initializer else p
         fitness = self._cost_func(p)  # fitness evaluated m times
         v = np.zeros((m, self.d))
         best_cost_ever = 1e200
@@ -192,6 +202,14 @@ class SLPSO:
             raise NotImplementedError("The cost function is not implemented. "
                                       "Otherwise, you should pass the cost function to the constructor.")
 
+    def _custom_particle_initializer(self, p):
+        """
+        :param p: particle matrix; shape: (m, d)
+        :return: p; updated initial particle matrix; shape: (m, d)
+        """
+        raise NotImplementedError("The custom particle initializer is not implemented. "
+                                  "Otherwise, you should pass the custom particle initializer to the constructor.")
+
 
 class GetLazinessBySLPSO(SLPSO):
     """
@@ -200,6 +218,7 @@ class GetLazinessBySLPSO(SLPSO):
     def __init__(self):
         super().__init__()
 
+        self._do_custom__particle_initializer = True
         self.env_original = None
 
         # # Initialize Ray
@@ -224,10 +243,10 @@ class GetLazinessBySLPSO(SLPSO):
         low = np.zeros(d, dtype=np.float32)
         high = np.ones(d, dtype=np.float32)
         M = 100
-        max_stagnation = 20  # 50
+        max_stagnation = 20  # 20
 
         # Reset the class with super's reset() method
-        super().reset(cost_func=None, d=d, low=low, high=high,  M=M, max_stagnation=max_stagnation)
+        super().reset(cost_func_=None, d=d, low=low, high=high,  M=M, max_stagnation=max_stagnation)
 
     def run(self, see_updates=False, see_time=False, maxfe=None):
         """
@@ -291,6 +310,27 @@ class GetLazinessBySLPSO(SLPSO):
 
         return cost
 
+    def _custom_particle_initializer(self, p):
+        """
+        Replace a particle with an artificial particle representing fully active laziness vector in the initial pop
+        :param p: particle matrix; shape: (m, d)
+        :return: p; updated initial particle matrix; shape: (m, d)
+        """
+        # # Get the number of particles
+        # m = p.shape[0]
+        # Get the number of agents
+        d = p.shape[1]
+        # Get data type
+        data_type_pop = p.dtype
+
+        # Create a fully active laziness vector
+        laziness_full_active = np.ones(d, dtype=data_type_pop)
+
+        # Replace the first particle with the fully active laziness vector
+        p[0, :] = laziness_full_active
+
+        return p
+
 
 def cost_func(p):
     # params: p: population; shape: (m, d)
@@ -307,7 +347,7 @@ if __name__ == "__main__":
     M = 100
 
     pso = SLPSO()
-    pso.reset(cost_func=cost_func, d=d, low=lu[0, :], high=lu[1, :], M=M)
+    pso.reset(cost_func_=cost_func, d=d, low=lu[0, :], high=lu[1, :], M=M)
     best_x, best_cost = pso.run(see_time=True, see_updates=True)
     print(f"Best x: {best_x}")
     print(f"Best cost: {best_cost}")

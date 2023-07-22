@@ -1,4 +1,4 @@
-# import numpy as np
+import numpy as np
 from env.envs import LazyAgentsCentralized  # environment
 from utils.metaheuristics import GetLazinessBySLPSO  # optimizer
 import copy  # for preserving the environment object in the results for later use
@@ -11,7 +11,7 @@ from datetime import datetime  # for getting current date and time
 if __name__ == '__main__':
     # Params
     num_agents = 20  # Fixed number of agents
-    num_experiments = 30  # Number of experiments
+    num_experiments = 5  # Number of experiments
     num_cpus = 14  # Number of CPUs to use for parallelization by Ray
 
     # Get start time
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         # Optional parameters
         "speed": 15,  # Speed in m/s. Default is 15
         "predefined_distance": 60,  # Predefined distance in meters. Default is 60
-        "communication_decay_rate": 1/3,  # Communication decay rate. Default is 1/3
+        "communication_decay_rate": 1 / 3,  # Communication decay rate. Default is 1/3
         "cost_weight": 1,  # Cost weight. Default is 1
         "inter_agent_strength": 5,  # Inter agent strength. Default is 5
         "bonding_strength": 1,  # Bonding strength. Default is 1
@@ -41,7 +41,8 @@ if __name__ == '__main__':
         "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
         "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
         "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
-        "max_time_step": 1000,  # Maximum time steps. Default is 1000,
+        "max_time_step": 2000,  # Maximum time steps. Default is 1000,
+        "incomplete_episode_penalty": -700,  # Penalty for incomplete episode. Default is -600
 
         # Step mode
         "auto_step": False,  # If True, the env will step automatically (i.e. episode length==1). Default: False
@@ -57,6 +58,8 @@ if __name__ == '__main__':
     # For storing results
     results = []
 
+    # Run experiments
+    fully_active_action = np.ones(num_agents, dtype=np.float32)
     for exp in range(num_experiments):
         # Create environment
         env = LazyAgentsCentralized(config)
@@ -66,12 +69,19 @@ if __name__ == '__main__':
         pso.set_env(copy.deepcopy(env))
         laziness, cost, _ = pso.run(see_updates=True, see_time=True)
 
+        env_fully_active = copy.deepcopy(env)
+        _, fully_active_episode_reward, _, _ = env_fully_active.auto_step(fully_active_action)
+
         print(f"\nExperiment {exp + 1}/{num_experiments}")
         print("Laziness: ", laziness)
-        print("Cost: ", cost)
+        print("Cost_lazy: ", cost)
+        print("Cost_fully_active: ", -fully_active_episode_reward)
 
         # Append environment and results to results list
-        results.append({"env": env, "laziness": laziness, "cost": cost})
+        results.append({"env": env,
+                        "laziness": laziness,
+                        "cost": cost,
+                        "cost_fully_active": -fully_active_episode_reward,})
 
     # Get current date and time
     current_directory = os.path.dirname(os.path.abspath(__file__))  # current directory where the script is located
@@ -103,10 +113,11 @@ if __name__ == '__main__':
 
     is_plural = lambda x: '' if x == 1 else 's'  # for printing plural forms
 
-    print("\nIt took {} day{}, {} hour{}, {} minute{}, and {} second{}".format(days, is_plural(days), hours,
-                                                                               is_plural(hours), minutes,
-                                                                               is_plural(minutes), seconds,
-                                                                               is_plural(seconds)))
+    print(f"\n\n Duration of the {num_experiments} experiments:")
+    print("    It took {} day{}, {} hour{}, {} minute{}, and {} second{}".format(days, is_plural(days), hours,
+                                                                                 is_plural(hours), minutes,
+                                                                                 is_plural(minutes), seconds,
+                                                                                 is_plural(seconds)))
 
     ray.shutdown()
     print("\n\nRay shutdown!")

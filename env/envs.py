@@ -5,6 +5,12 @@ import numpy as np
 
 
 class LazyAgentsCentralized(gym.Env):
+    """
+    Lazy Agents environment
+    - Note (1): with the default settings, the average reward per step was -0.387909 in a 10000-episode test
+    - Note (2): with the default settings, the maximum number of time steps was 1814 in the test
+    - Note (3): with the default settings, the average number of time steps was 572.4 in the test
+    """
     # TODO (0): [x] Should we use RELATIVE position and angle as the embeddings (observation)?
     # TODO (1): [o] Check agent update method (t vs t+1)
     # TODO (2): [△] Check if the reference variables in the state changes after assignment (e.g. self.is_padded)
@@ -52,14 +58,20 @@ class LazyAgentsCentralized(gym.Env):
                 "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
                 "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
                 "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
-                "max_time_step": 1000,  # Maximum time steps. Default is 1000,
-                "incomplete_episode_penalty": -600, # Penalty for incomplete episode. Default is -600
+                "max_time_step": 2000,  # Maximum time steps. Default is 2000,
+                #                         Note: With the default settings, albeit 1000 was insufficient sometimes,
+                #                               2000 would be sufficient for convergence of fully active agents.
+                #                               In fact, 1814 was the maximum time step out of the 10000 episodes.
+                "incomplete_episode_penalty": -600,  # Penalty for incomplete episode. Default is -600
 
                 # Step mode
                 "auto_step": False,  # If True, the env will step automatically (i.e. episode length==1). Default: False
 
                 # Ray config
                 "use_custom_ray": False,  # If True, immutability of the env will be ensured. Default: False
+
+                # For RLlib models
+                "use_preprocessed_obs": True,  # If True, the env will return preprocessed obs. Default: True
             }
         """
 
@@ -100,10 +112,10 @@ class LazyAgentsCentralized(gym.Env):
             if "std_pos_rate_converged" in self.config else 0.1  # m
         self.std_vel_rate_converged = self.config["std_vel_rate_converged"] \
             if "std_vel_rate_converged" in self.config else 0.2  # m/s
-        self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 1000
+        self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 2000
         self.incomplete_episode_penalty = self.config["incomplete_episode_penalty"] \
             if "incomplete_episode_penalty" in self.config else -600
-        assert self.incomplete_episode_penalty < 0, "incomplete_episode_penalty must be less than 0"
+        assert self.incomplete_episode_penalty <= 0, "incomplete_episode_penalty must be less than 0 (or 0)"
 
         # Step mode
         self.do_auto_step = self.config["auto_step"] if "auto_step" in self.config else False
@@ -111,6 +123,10 @@ class LazyAgentsCentralized(gym.Env):
         # Ray config (SL-PSO checks the immutability of the env; so, make it true if you want to use ray in SL-PSO)
         # If with RLlib, you probably need to set it to False.
         self.use_custom_ray = self.config["use_custom_ray"] if "use_custom_ray" in self.config else False
+
+        # For RLlib models
+        self.use_preprocessed_obs = self.config["use_preprocessed_obs"] \
+            if "use_preprocessed_obs" in self.config else True
 
         # Define action space
         # Laziness vector; padding included
@@ -120,8 +136,17 @@ class LazyAgentsCentralized(gym.Env):
 
         # Define observation space
         self.d_v = 6  # data dim; [x, y, vx, vy, theta, omega]
+        # low_bound_single_agent = np.array([-np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -self.u_max])
+        # high_bound_single_agent = np.array([np.inf, np.inf, np.inf, np.inf, np.inf, self.u_max])
+        # # TODO: Check the bounds; tighter bounds better? [inf, inf, v, v, pi, u_max]?
+        # low_bound_all_agents = np.tile(low_bound_single_agent, (self.num_agents_max, 1))
+        # high_bound_all_agents = np.tile(high_bound_single_agent, (self.num_agents_max, 1))
+        low_bound_all_agents = -np.inf
+        high_bound_all_agents = np.inf
+
         self.observation_space = Dict({
-            "agent_embeddings": Box(low=0, high=1, shape=(self.num_agents_max, self.d_v), dtype=np.float32),
+            "agent_embeddings": Box(low=low_bound_all_agents, high=high_bound_all_agents,
+                                    shape=(self.num_agents_max, self.d_v), dtype=np.float32),
             "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
             "pad_tokens": Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.int32),
         })
@@ -183,7 +208,7 @@ class LazyAgentsCentralized(gym.Env):
         # Also, w_0 == zeros; No control at all, you dumb ass :-(
 
         # Get observation in a dict
-        observation = self.get_observation()
+        observation = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs)
 
         # Initialize convergence check variables
         self.std_pos_hist = np.zeros(self.max_time_step)
@@ -195,24 +220,93 @@ class LazyAgentsCentralized(gym.Env):
 
         return observation
 
-    def get_observation(self):
+    def get_observation(self, get_preprocessed_obs, mask=None):
         # Get agent embeddings
-        agent_embeddings = self.agent_states[:, :self.d_v]  # TODO: Check the dimension
+        if get_preprocessed_obs:
+            obs = self.preprocess_obs(mask=mask)
+        else:
+            agent_embeddings = self.agent_states[:, :self.d_v]
 
-        # Get network topology
-        net_topology = self.net_topology_full
+            # Get network topology
+            net_topology = self.net_topology_full
 
-        # Get padding tokens
-        pad_tokens = self.is_padded
+            # Get padding tokens
+            pad_tokens = self.is_padded
 
-        # Get observation in a dict
-        obs = {
-            "agent_embeddings": agent_embeddings,
-            "net_topology": net_topology,
-            "pad_tokens": pad_tokens,
-        }
+            # Get observation in a dict
+            obs = {
+                "agent_embeddings": agent_embeddings,
+                "net_topology": net_topology,
+                "pad_tokens": pad_tokens,
+            }
 
         return obs
+
+    def preprocess_obs(self, mask=None):
+        # Processes the observation
+        # Here, particularly, agent_embeddings; net_topology and pad_tokens are intact, right now.
+        # agent_embeddings = [x, y, vx, vy, heading, heading rate]
+        # Move agent_embeddings in the original coordinate to another coordinate
+        # The new coordinate is translated by the center of the agents (CoM of the agents' positions)
+        # and rotated by the average heading of the agents.
+
+        # Get mask; (shows non-padding agents)
+        mask = self.is_padded == 0 if mask is None else mask  # shape (num_agents_max,)
+
+        # Get agent states
+        agent_positions = self.agent_pos[mask, :]  # shape (num_agents, 2); masked
+        agent_angles = self.agent_ang[mask, :]  # shape (num_agents, 1); masked
+        agent_angles = self.wrap_to_pi(agent_angles)  # shape (num_agents, 1)
+        agent_angular_velocities = self.agent_omg[mask, :]  # shape (num_agents, 1); masked
+
+        # Get the center of the agents (CoM of the agents' positions)
+        center = np.mean(agent_positions, axis=0)  # shape (2,)
+        # Get the average heading of the agents
+        avg_heading = np.mean(agent_angles)  # shape (); scalar
+
+        # Get the rotation matrix
+        rot_mat = np.array([[np.cos(avg_heading), -np.sin(avg_heading)],
+                            [np.sin(avg_heading), np.cos(avg_heading)]])  # shape (2, 2)
+
+        # Translate the center to the origin
+        agent_positions_translated = agent_positions - center  # shape (num_agents, 2)
+        # Rotate the translated positions
+        agent_positions_transformed = np.dot(agent_positions_translated, rot_mat)  # shape (num_agents, 2)
+        # Translate the agent angles
+        agent_angles_transformed = agent_angles - avg_heading  # shape (num_agents, 1)
+        # Wrap the agent angles
+        agent_angles_transformed = self.wrap_to_pi(agent_angles_transformed)  # shape (num_agents, 1)
+
+        # Calculate the relative velocity = [v*cos(ang_new), v*sin(ang_new)]  # shape (num_agents, 2)
+        # This is omitted for faster computation (concatenating them in the next step)
+        # agent_velocities_transformed = self.v * np.concatenate((np.cos(agent_angles_transformed),
+        #                                                         np.sin(agent_angles_transformed)), axis=1)
+
+        # Concatenate the transformed states as embeddings
+        agent_embeddings_transformed_masked = np.concatenate(
+            (
+                agent_positions_transformed,
+                self.v * np.cos(agent_angles_transformed),
+                self.v * np.sin(agent_angles_transformed),
+                agent_angles_transformed,  # wrapped angles
+                agent_angular_velocities
+            ),
+            axis=1
+        )  # shape (num_agents, 6)
+
+        # Pad the transformed states
+        # agent_embeddings_transformed_unmasked: shape (num_agents_max, 6)
+        agent_embeddings_transformed_unmasked = np.zeros((self.num_agents_max, 6), dtype=np.float32)
+        agent_embeddings_transformed_unmasked[mask, :] = agent_embeddings_transformed_masked
+
+        # Get the preprocessed observation in a dict
+        obs_preprocessed = {
+            "agent_embeddings": agent_embeddings_transformed_unmasked,
+            "net_topology": self.net_topology_full,
+            "pad_tokens": self.is_padded,
+        }
+
+        return obs_preprocessed
 
     def pad_states(self, mask=None):
         # Hard-pad agent states
@@ -393,7 +487,7 @@ class LazyAgentsCentralized(gym.Env):
                   ):
         # The given action is continuously used in all single_step calls until the episode is done.
 
-        obs = self.get_observation()
+        obs = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs)
         episode_reward = 0
         done = False
         info = {}
@@ -428,7 +522,7 @@ class LazyAgentsCentralized(gym.Env):
         self.update_state(u=self.u, mask=mask)  # state transition 2/2
 
         # Get observation
-        obs = self.get_observation()
+        obs = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)
 
         # Compute reward
         # TODO: When should we compute reward?
@@ -646,6 +740,7 @@ class LazyAgentsCentralized(gym.Env):
         # Shape of reward: (1,)  TODO: check the data types!
         total_cost = control_cost + self.rho * fuel_cost
         reward = - total_cost  # maximize the reward == minimize the cost
+        # i.e. reward is negative in most cases in this environment
 
         # Check the data type of the reward
         assert isinstance(reward, float) or isinstance(reward, np.float32)  # TODO: delete this line as well, l8r
@@ -656,7 +751,7 @@ class LazyAgentsCentralized(gym.Env):
         # Penalize the RL-agent if the task is not completed
         if self.time_step >= self.max_time_step-1:
             reward = self.incomplete_episode_penalty
-            print("Task was not completed within the maximum time step!")
+            # print("Task was not completed within the maximum time step!")
 
         return reward
 
