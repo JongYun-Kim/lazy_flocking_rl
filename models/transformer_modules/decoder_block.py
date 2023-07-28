@@ -36,8 +36,8 @@ class CustomDecoderBlock(nn.Module):
 
         if efficient:
             # self.residual1 = NoResidualButSameForward()
-            self.residual2 = NoResidualButSameForward()
-            self.residual3 = NoResidualButSameForward()
+            self.residual2 = NoResidualButSameForward(norm=copy.deepcopy(norm))
+            self.residual3 = NoResidualButSameForward(norm=copy.deepcopy(norm))
         else:
             # self.residual1 = ResidualConnectionLayer(copy.deepcopy(norm), dr_rate)
             self.residual2 = ResidualConnectionLayer(copy.deepcopy(norm), dr_rate)

@@ -5,9 +5,13 @@ import copy
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils.typing import ModelConfigDict, TensorType  # for type hints and annotations in functions
 from ray.rllib.utils.framework import try_import_torch
+from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper # for custom action distribution
+from ray.rllib.models.action_dist import ActionDistribution
+from ray.rllib.utils.annotations import override
 
 # Python modules
 import numpy as np
+import gym
 from typing import Dict, List, Union
 
 # Custom modules
@@ -20,10 +24,41 @@ from models.transformer_modules.decoder_block import CustomDecoderBlock as Decod
 from models.transformer_modules.encoder import Encoder
 from models.transformer_modules.decoder import Decoder, DecoderPlaceholder
 from models.transformer_modules.pointer_net import GaussianActionDistGenerator, GaussianActionDistPlaceholder
+from models.transformer_modules.pointer_net import MeanGenerator, PointerPlaceholder, FakeMeanGenerator
 
 # PyTorch's modules
 # import torch.nn.functional as F
-torch, nn = try_import_torch()  # This is a wrapper for importing torch and torch.nn in a try-except block in rl-lib
+import torch
+import torch.nn as nn
+# torch, nn = try_import_torch()  # This is a wrapper for importing torch and torch.nn in a try-except block in rl-lib
+# try_import_torch() makes my IDE confused about the type hints and annotations in functions; Particularly, __call__.
+
+
+class TorchDeterministicContinuousActionDist(TorchDistributionWrapper):
+    """Action distribution that returns the input values directly.
+
+    This is similar to DiagGaussian with standard deviation zero (thus only
+    requiring the "mean" values as NN output).
+    """
+
+    @override(ActionDistribution)
+    def deterministic_sample(self) -> TensorType:
+        return self.inputs
+
+    @override(TorchDistributionWrapper)
+    def sampled_action_logp(self) -> TensorType:
+        return torch.zeros((self.inputs.size()[0],), dtype=torch.float32)
+
+    @override(TorchDistributionWrapper)
+    def sample(self) -> TensorType:
+        return self.deterministic_sample()
+
+    @staticmethod
+    @override(ActionDistribution)
+    def required_model_output_shape(
+        action_space: gym.Space, model_config: ModelConfigDict
+    ) -> Union[int, np.ndarray]:
+        return np.prod(action_space.shape, dtype=np.int32)
 
 
 class LazinessAllocator(nn.Module):
@@ -38,9 +73,18 @@ class LazinessAllocator(nn.Module):
     ):
 
         super().__init__()
+        # nn.Module.__init__(self)
 
         # Get device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Temp: action distribution
+        if isinstance(generator, (GaussianActionDistGenerator, GaussianActionDistPlaceholder)):
+            self.use_deterministic_action_dist = False
+        elif isinstance(generator, (MeanGenerator, PointerPlaceholder)):
+            self.use_deterministic_action_dist = True
+        else:
+            raise ValueError("generator must be an instance of GaussianActionDistGenerator or MeanGenerator")
 
         # Define layers
         self.src_embed = src_embed
@@ -48,7 +92,8 @@ class LazinessAllocator(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         # Action branch: Gaussian pointer network for Gaussian action distribution
-        self.gaussian_action_dist_generator = generator
+        self.gaussian_action_dist_generator = generator if not self.use_deterministic_action_dist else None
+        self.deterministic_action_dist_generator = generator if self.use_deterministic_action_dist else None
 
         # custom layers if needed
         #
@@ -59,8 +104,8 @@ class LazinessAllocator(nn.Module):
     def decode(self, tgt, encoder_out, tgt_mask, src_tgt_mask):
         return self.decoder(tgt, encoder_out, tgt_mask, src_tgt_mask)
 
-    def __call__(self, x):
-        return self.forward(x)
+    # def __call__(self, x):  # TODO: Do remove it ASAP
+    #     return self.forward(x)
 
     def forward(
         self,
@@ -89,21 +134,27 @@ class LazinessAllocator(nn.Module):
 
         # Decoder
         # Get the context vector; here, we just average the encoder output
-        # h_c_N: shape: (batch_size, 1, d_embed_context);  d_embed_context == 3 * d_embed
+        # h_c_N: shape: (batch_size, 1, d_embed_context);  d_embed_context == 3 * d_embed (not true right now)
         h_c_N = self.get_context_node(embeddings=encoder_out, pad_tokens=pad_tokens, use_embeddings_mask=True)
         # decoder_out: (batch_size, tgt_seq_len, d_embed_context)
         # tgt_seq_len == 1 in our case
         decoder_out = self.decode(h_c_N, encoder_out, tgt_mask, src_tgt_mask.unsqueeze(1))  # h_c^(N+1)
 
         # Generators: query==decoder_out; key==encoder_out; return==mean/std
-        # out_mean: (batch_size, tgt_seq_len, seq_len_src) == (batch_size, 1, num_agents_max)
-        # out_std: (batch_size, tgt_seq_len, seq_len_src) == (batch_size, 1, num_agents_max)
-        out_mean, out_std = self.gaussian_action_dist_generator(query=decoder_out, key=encoder_out, mask=src_tgt_mask)
-        # Concatenate the mean and std along the last dimension (squeeze(1) on both tensors)
-        # out: (batch_size, 2 * seq_len_src) == (batch_size, 2 * num_agents_max) == (batch_size, num_outputs)
-        out = torch.cat((out_mean.squeeze(1), out_std.squeeze(1)), dim=-1)  # (batch_size, num_outputs)
-        assert out.shape == (agent_embeddings.shape[0], 2 * agent_embeddings.shape[1]), \
-            "The shape of the output tensor is not correct."  # TODO: remove this once the model is stable
+        if self.use_deterministic_action_dist:
+            # out: (batch_size, tgt_seq_len, seq_len_src) == (batch_size, 1, num_agents_max)
+            out = self.deterministic_action_dist_generator(query=decoder_out, key=encoder_out, mask=src_tgt_mask)
+            # out: (batch_size, seq_len_src) == (batch_size, num_agents_max) == (batch_size, num_outputs)
+            out = out.squeeze(1)  # (batch_size, num_outputs)
+        else:
+            # out_mean: (batch_size, tgt_seq_len, seq_len_src) == (batch_size, 1, num_agents_max)
+            # out_std: (batch_size, tgt_seq_len, seq_len_src) == (batch_size, 1, num_agents_max)
+            out_mean, out_std = self.gaussian_action_dist_generator(query=decoder_out, key=encoder_out, mask=src_tgt_mask)
+            # Concatenate the mean and std along the last dimension (squeeze(1) on both tensors)
+            # out: (batch_size, 2 * seq_len_src) == (batch_size, 2 * num_agents_max) == (batch_size, num_outputs)
+            out = torch.cat((out_mean.squeeze(1), out_std.squeeze(1)), dim=-1)  # (batch_size, num_outputs)
+            assert out.shape == (agent_embeddings.shape[0], 2 * agent_embeddings.shape[1]), \
+                "The shape of the output tensor is not correct."  # TODO: remove this once the model is stable
 
         # Return
         # out: (batch_size, src_seq_len)
@@ -227,7 +278,9 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         #     "norm_eps": 1e-5,
         #     "is_bias": True,
         #     "share_layers": True,
-        #     "ignore_residual_in_decoder": False,
+        #     "use_residual_in_decoder": True,
+        #     "use_FNN_in_decoder": True,
+        #     "use_deterministic_action_dist": False,
         # },
         """
 
@@ -259,7 +312,27 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         dr_rate = cfg["dr_rate"] if "dr_rate" in cfg else 0
         norm_eps = cfg["norm_eps"] if "norm_eps" in cfg else 1e-5
         is_bias = cfg["is_bias"] if "is_bias" in cfg else True  # bias in MHA linear layers (W_q, W_k, W_v)
-        ignore_residual_in_decoder = cfg["ignore_residual_in_decoder"] if "ignore_residual_in_decoder" in cfg else False
+        use_residual_in_decoder = cfg["use_residual_in_decoder"] if "use_residual_in_decoder" in cfg else True
+        use_FNN_in_decoder = cfg["use_FNN_in_decoder"] if "use_FNN_in_decoder" in cfg else True
+        use_deterministic_action_dist = cfg["use_deterministic_action_dist"] \
+            if "use_deterministic_action_dist" in cfg else False
+
+        if "ignore_residual_in_decoder" in cfg:
+            use_residual_in_decoder = not cfg["ignore_residual_in_decoder"]
+            # DeprecationWarning: ignore_residual_in_decoder is deprecated; use_residual_in_decoder is used instead
+            print("DeprecationWarning: ignore_residual_in_decoder is deprecated; use use_residual_in_decoder instead")
+            use_FNN_in_decoder = use_residual_in_decoder
+            print("use_FNN_in_decoder is set to use_residual_in_decoder as {}".format(use_residual_in_decoder))
+        if use_residual_in_decoder != use_FNN_in_decoder:
+            # Warning: use_residual_in_decoder != use_FNN_in_decoder; but don't change it
+            warning_text = "Warning: use_residual_in_decoder != use_FNN_in_decoder; but don't change it"
+            for i in range(7):
+                print(("%"*i) + warning_text + ("%"*i))
+        if n_layers_decoder >= 2 and not use_residual_in_decoder:
+            # Warning: multiple decoder blocks often require residual connections
+            warning_text = "Warning: multiple decoder blocks often require residual connections"
+            for i in range(7):
+                print(("%"*i) + warning_text + ("%"*i))
 
         # 1. Define layers
 
@@ -292,12 +365,12 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
             out_fc=nn.Linear(d_model_decoder, d_embed_context, is_bias),
             dr_rate=dr_rate,
         )
-        # position_ff_decoder = PositionWiseFeedForwardLayer(
-        #     fc1=nn.Linear(d_embed_context, d_ff_decoder),
-        #     fc2=nn.Linear(d_ff_decoder, d_embed_context),
-        #     dr_rate=dr_rate,
-        # )
-        # norm_decoder = nn.LayerNorm(d_embed_context, eps=norm_eps)
+        position_ff_decoder = PositionWiseFeedForwardLayer(
+            fc1=nn.Linear(d_embed_context, d_ff_decoder),
+            fc2=nn.Linear(d_ff_decoder, d_embed_context),
+            dr_rate=dr_rate,
+        ) if use_FNN_in_decoder else None
+        norm_decoder = nn.LayerNorm(d_embed_context, eps=norm_eps)
 
         # 1-3. Block Level
         encoder_block = EncoderBlock(
@@ -309,14 +382,13 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         decoder_block = DecoderBlock(
             self_attention=None,  # No self-attention in the decoder_block in this case!
             cross_attention=copy.deepcopy(mha_decoder),
-            position_ff=None,  # No position-wise FFN in the decoder_block in this case!
-            # norm=copy.deepcopy(norm_decoder),
-            norm=nn.Identity(),
+            position_ff=position_ff_decoder,  # No position-wise FFN in the decoder_block in most cases!
+            norm=copy.deepcopy(norm_decoder),
             dr_rate=dr_rate,
-            efficient=ignore_residual_in_decoder,
+            efficient=not use_residual_in_decoder,
         )
 
-        # 1-4. Transformer Level (Encoder + Decoder)
+        # 1-4. Transformer Level (Encoder + Decoder + Generator)
         encoder = Encoder(
             encoder_block=encoder_block,
             n_layer=n_layers_encoder,
@@ -325,20 +397,42 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         decoder = Decoder(
             decoder_block=decoder_block,
             n_layer=n_layers_decoder,
-            # norm=copy.deepcopy(norm_decoder),)
-            norm=nn.Identity(),
+            norm=copy.deepcopy(norm_decoder),
+            # norm=nn.Identity(),
         )
-        generator = GaussianActionDistGenerator(
-            d_model=d_model,
-            q_fc=nn.Linear(d_embed_context, d_model, is_bias),
-            k_fc=nn.Linear(d_embed_input, d_model, is_bias),
-            clip_value_mean=clip_action_mean,
-            clip_value_std=clip_action_log_std,
-            dr_rate=dr_rate,
-        )  # outputs a probability distribution over the input sequence
+        if use_deterministic_action_dist:
+            # generator = MeanGenerator(
+            #     d_model=d_model,
+            #     q_fc=nn.Linear(d_embed_context, d_model, is_bias),
+            #     k_fc=nn.Linear(d_embed_input, d_model, is_bias),
+            #     clip_value=clip_action_mean,
+            #     dr_rate=dr_rate,
+            # )
+            generator = FakeMeanGenerator(  # is actually a continuous Gaussian dist with very small std
+                d_model=d_model,
+                q_fc=nn.Linear(d_embed_context, d_model, is_bias),
+                k_fc=nn.Linear(d_embed_input, d_model, is_bias),
+                clip_value_mean=clip_action_mean,
+                clip_value_std=clip_action_log_std,  # all log_std-s are set to this value
+                dr_rate=dr_rate,
+            )
+        else:  # Gaussian action distribution
+            generator = GaussianActionDistGenerator(
+                d_model=d_model,
+                q_fc=nn.Linear(d_embed_context, d_model, is_bias),
+                k_fc=nn.Linear(d_embed_input, d_model, is_bias),
+                clip_value_mean=clip_action_mean,
+                clip_value_std=clip_action_log_std,
+                dr_rate=dr_rate,
+            )  # outputs a probability distribution over the input sequence
 
         action_size = action_space.shape[0]  # it gives d given that action_space is a Box of d dimensions
-        assert num_outputs == 2 * action_size, "num_outputs must be 2 * action_size"
+        # if use_deterministic_action_dist:
+        #     assert num_outputs == action_size, "num_outputs must be action_size; use deterministic action distribution"
+        # else:
+        #     assert num_outputs == 2 * action_size, "num_outputs must be 2 * action_size"
+
+        assert num_outputs == 2 * action_size, "num_outputs must be action_size; use deterministic action distribution"
 
         # 2. Define policy network
         self.policy_network = LazinessAllocator(
@@ -361,13 +455,13 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
                 #      self.values should use h_c_N instead of h_c_N1 with a different value branch
                 #      If so, the decoder is not used in the value network
                 # generator=copy.deepcopy(generator),
-                generator=GaussianActionDistPlaceholder(),
+                generator=GaussianActionDistPlaceholder() #if not use_deterministic_action_dist else PointerPlaceholder(),
             )
 
         self.value_branch = nn.Sequential(
-            nn.Linear(d_embed_context, d_embed_context),
+            nn.Linear(in_features=d_embed_context, out_features=d_embed_context),
             nn.ReLU(),
-            nn.Linear(d_embed_context, 1),
+            nn.Linear(in_features=d_embed_context, out_features=1),  # state-value function
         )
 
     def forward(
@@ -386,10 +480,12 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         # x: (batch_size, 2 * action_size); action_size==num_UAVs==num_agents_max
         # h_c_N1: (batch_size, 1, d_embed_context)
         if self.share_layers:
-            x, _, h_c_N = self.policy_network(obs)  # x: mean and std of the Gaussian distribution
-            self.values = h_c_N.squeeze(1)  # (batch_size, d_embed_context)
+            x, h_c_N1, h_c_N = self.policy_network(obs)  # x: mean and std of the Gaussian distribution
+            # self.values = h_c_N.squeeze(1)  # (batch_size, d_embed_context)
+            self.values = h_c_N1.squeeze(1)  # (batch_size, d_embed_context)  # TODO: try this but not sure
         else:
             x, _, _ = self.policy_network(obs)
+            # input of the value branch is h_c_N instead of h_c_N1 in the case of shared layers
             self.values = self.value_network(obs)[2].squeeze(1)  # self.values: (batch_size, d_embed_context)
 
         # Check batch dimension size for debugging purposes

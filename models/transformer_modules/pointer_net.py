@@ -118,9 +118,10 @@ class GaussianActionDistGenerator(nn.Module):
                 # Apply the mask to the attention scores
                 attention_score = attention_score.masked_fill(mask == 0, neutral_action)
         elif mode == 'std':
-            # Apply clipping to the attention scores using the clip_value; [-clip_value, 0]
+            # Apply clipping to the attention scores using the clip_value; [-clip_value, -u]
+            u = 2  # 0
             # attention_score = self.clip_value_std * (torch.sigmoid(attention_score) - 1)
-            attention_score = self.clip_value_std * (torch.tanh(attention_score) - 1) / 2
+            attention_score = (self.clip_value_std - u) * ((torch.tanh(attention_score)-1)/2) - u
             small_log_std = -10
             if mask is not None:
                 # Apply the mask to the attention scores
@@ -169,6 +170,27 @@ class GaussianActionDistPlaceholder(nn.Module):
         return out_mean, out_std
 
 
+class FakeMeanGenerator(GaussianActionDistGenerator):
+    def forward(self, *args, query, key, mask=None):
+        # query:      (n_batch, seq_len_query, d_embed_query) - Batch of query vectors
+        # key:        (n_batch, seq_len_key,   d_embed_key) - Batch of key vectors
+        # mask:       (n_batch, seq_len_query, seq_len_key) - Mask tensor
+
+        # Apply the linear transformations to the queries and keys
+        query_mean = self.q_fc_mean(query)  # (n_batch, seq_len_query, d_model)
+        key_mean = self.k_fc_mean(key)      # (n_batch, seq_len_key,   d_model)
+
+        # Calculate the attention scores
+        # attention_score_mean: (n_batch, seq_len_query, seq_len_key) - The attention scores for the mean
+        attention_score_mean = self.calculate_attention(query_mean, key_mean, mask, mode='mean')
+        # Get the std as a constant tensor: small log_std (meaning std close to 0)
+        attention_score_log_std_constant = torch.ones_like(attention_score_mean) * (-self.clip_value_std)
+        # if mask is not None:
+        #     attention_score_log_std_constant = attention_score_log_std_constant.masked_fill(mask == 0, 0)
+
+        return attention_score_mean, attention_score_log_std_constant  # (n_batch, seq_len_query, seq_len_key)s
+
+
 class MeanGenerator(PointerProbGenerator):
 
     def calculate_attention(self, query, key, mask):
@@ -180,7 +202,7 @@ class MeanGenerator(PointerProbGenerator):
         attention_score = torch.matmul(query, key.transpose(-2, -1))  # Calculate the dot product: (Q x K^T)
         attention_score = attention_score / math.sqrt(d_k)  # Scale the attention scores
         # Apply clipping to the attention scores using the clip_value; [0, clip_value]
-        # attention_score = self.clip_value * torch.sigmoid(attention_score)
+        # attention_score = self.clip_value_mean * torch.sigmoid(attention_score)
         attention_score = self.clip_value * (torch.tanh(attention_score) + 1) / 2
         neutral_action = 0
         if mask is not None:

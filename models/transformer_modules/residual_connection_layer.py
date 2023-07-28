@@ -53,10 +53,15 @@ class IdentityResidualLayer(nn.Module):
 class NoResidualButSameForward(nn.Module):
     """
     It does not do a residual connection, but it does the same forward pass as the sub_layer.
+    It also does the normalization if norm is not None or nn.Identity().
     """
-    def __init__(self):
+    def __init__(self, norm):
         super(NoResidualButSameForward, self).__init__()
+        self.norm = norm
+        # Update dropout layer if necessary
 
     def forward(self, x, sub_layer, *args, **kwargs):
         # Just to align with the grammar of the placeholder where this class is replaced
+        if self.norm is not None:
+            x = self.norm(x)
         return sub_layer(x, *args, **kwargs)
