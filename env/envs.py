@@ -1,4 +1,5 @@
 import gym
+import matplotlib.pyplot as plt
 from gym.spaces import Box, Dict
 import numpy as np
 # from utils.metaheuristics import SLPSO as PSO
@@ -72,6 +73,13 @@ class LazyAgentsCentralized(gym.Env):
 
                 # For RLlib models
                 "use_preprocessed_obs": True,  # If True, the env will return preprocessed obs. Default: True
+                "use_mlp_settings": False,  # If True, flatten obs used without topology and padding. Default: False
+                #                             Note: No padding applied to the MLP settings for now
+
+                # Plot config
+                "get_state_hist": False,  # If True, state_hist stored. Use this for plotting. Default: False
+                # try to leave it empty in your config unless you explicitly want to plot
+                # as it's gonna be False by default, use more memory, and slow down the training/evaluation
             }
         """
 
@@ -127,6 +135,10 @@ class LazyAgentsCentralized(gym.Env):
         # For RLlib models
         self.use_preprocessed_obs = self.config["use_preprocessed_obs"] \
             if "use_preprocessed_obs" in self.config else True
+        self.use_mlp_settings = self.config["use_mlp_settings"] if "use_mlp_settings" in self.config else False
+
+        # Plot config
+        self.get_state_hist = self.config["get_state_hist"] if "get_state_hist" in self.config else False
 
         # Define action space
         # Laziness vector; padding included
@@ -144,12 +156,16 @@ class LazyAgentsCentralized(gym.Env):
         low_bound_all_agents = -np.inf
         high_bound_all_agents = np.inf
 
-        self.observation_space = Dict({
-            "agent_embeddings": Box(low=low_bound_all_agents, high=high_bound_all_agents,
-                                    shape=(self.num_agents_max, self.d_v), dtype=np.float32),
-            "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
-            "pad_tokens": Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.int32),
-        })
+        if self.use_mlp_settings:
+            self.observation_space = Box(low=low_bound_all_agents, high=high_bound_all_agents,
+                                         shape=(self.num_agents_max * self.d_v,), dtype=np.float32)
+        else:
+            self.observation_space = Dict({
+                "agent_embeddings": Box(low=low_bound_all_agents, high=high_bound_all_agents,
+                                        shape=(self.num_agents_max, self.d_v), dtype=np.float32),
+                "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
+                "pad_tokens": Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.int32),
+            })
         self.is_padded = None  # 1 if the task is padded, 0 otherwise; shape (num_agents_max,)
 
         # Define variables
@@ -158,7 +174,7 @@ class LazyAgentsCentralized(gym.Env):
         self.agent_vel = None  # shape (num_agents_max, 2)
         self.agent_ang = None  # shape (num_agents_max, 1)
         self.agent_omg = None  # shape (num_agents_max, 1)
-        self.agent_states = None  # shape (num_agents_max, 6)
+        self.agent_states = None  # shape (num_agents_max, 6==d_v)
         self.adjacency_matrix = None   # w/o padding;  shape (num_agents, num_agents)
         self.net_topology_full = None  # with padding; shape (num_agents_max, num_agents_max)
         self.center_in_star_net = None  # center agent index of star network; shape (1,)? or ()
@@ -174,6 +190,10 @@ class LazyAgentsCentralized(gym.Env):
         self.num_agent = None
         self.num_agent_min = None
         self.num_agent_max = None
+
+        # For plotting
+        self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
+            if self.get_state_hist else None
 
     def reset(self):
         # Reset agent number
@@ -218,6 +238,10 @@ class LazyAgentsCentralized(gym.Env):
         self.time_step = 0
         self.clock_time = 0
 
+        # Get initial state if needed
+        if self.get_state_hist:
+            self.state_hist[self.time_step, :, :] = self.agent_states
+
         return observation
 
     def get_observation(self, get_preprocessed_obs, mask=None):
@@ -239,6 +263,12 @@ class LazyAgentsCentralized(gym.Env):
                 "net_topology": net_topology,
                 "pad_tokens": pad_tokens,
             }
+
+        if self.use_mlp_settings:
+            # Use only agent_embeddings
+            obs = obs["agent_embeddings"]  # shape (num_agents_max, d_v)
+            # Flatten the observation
+            obs = obs.flatten()  # shape (num_agents_max * d_v,)
 
         return obs
 
@@ -508,8 +538,11 @@ class LazyAgentsCentralized(gym.Env):
         # TODO: Check if the mask is silently updated in the run-time; if yes, then u d better use a copy of it
         mask = self.is_padded == 0
 
-        # Get the laziness
-        c_lazy = action  # TODO: think about the dimensionality of the action
+        # Get the laziness from clipped action
+        action_lower_bound = 0
+        action_upper_bound = 1
+        c_lazy = np.clip(action, action_lower_bound, action_upper_bound)
+        # TODO: think about the dimensionality of the action
 
         # Update the control input:
         #   >>  u_{t+1} = f(x_t, y_t, vx_t, vy_t, θ_t, w_t);  != f(s_{t+1})
@@ -523,6 +556,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get observation
         obs = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)
+
+        # Get state history: get it before updating the time step (overriding the initial state from the reset method)
+        if self.get_state_hist:
+            self.state_hist[self.time_step, :, :] = self.agent_states
 
         # Compute reward
         # TODO: When should we compute reward?
@@ -872,6 +909,131 @@ class LazyAgentsCentralized(gym.Env):
         # Render the environment
         pass
 
+    def plot_std_hist(self, ax_std_hist=None, fig_std_hist=None, std_pos_hist=None, std_vel_hist=None):
+        # Typical usage: self.plot_std_hist(ax, fig)
+
+        # Create a new figure and axis if not provided
+        if ax_std_hist is None:
+            if fig_std_hist is None:
+                fig_std_hist, ax_std_hist = plt.subplots()  # Create a new figure and axis
+            else:
+                ax_std_hist = fig_std_hist.add_subplot(111)  # Add a new axis to the provided figure
+
+        # Plot the standard deviation history
+        if std_pos_hist is None:
+            std_pos_hist = self.std_pos_hist[:self.time_step]
+        if std_vel_hist is None:
+            std_vel_hist = self.std_vel_hist[:self.time_step]
+        # Validate the input
+        assert len(std_pos_hist) == len(std_vel_hist)
+        assert len(std_pos_hist) == self.time_step
+
+        ax_std_hist.clear()
+        ax_std_hist.set_title("Standard Deviation Histories")
+        ax_std_hist.set_xlabel("Time step")
+        ax_std_hist.set_ylabel("Standard deviation")
+
+        ax_std_hist.plot(std_pos_hist, label="position std")
+        ax_std_hist.plot(std_vel_hist, label="velocity std")
+        ax_std_hist.legend()
+        ax_std_hist.grid(True)
+
+        plt.draw()
+        plt.pause(0.001)
+
+        return fig_std_hist, ax_std_hist
+
+    def plot_trajectory(self, ax_trajectory=None, fig_trajectory=None):
+        # Typical usage: self.plot_trajectory(ax, fig)
+
+        # Create a new figure and axis if not provided
+        if ax_trajectory is None:
+            if fig_trajectory is None:
+                fig_trajectory, ax_trajectory = plt.subplots()
+            else:
+                ax_trajectory = fig_trajectory.add_subplot(111)
+
+        # Check if the trajectory is available
+        if self.state_hist is None:
+            print("Warning: The trajectory is not available. Pleas check if you set env.state_hist=True.")
+            return None, None
+
+        # Plot the trajectory
+        ax_trajectory.clear()
+        ax_trajectory.set_title("Trajectory")
+        ax_trajectory.set_xlabel("x")
+        ax_trajectory.set_ylabel("y")
+        ax_trajectory.set_aspect('equal', 'box')
+
+        # Get mask for the agents that are alive
+        # Note: this assumes that the agents were not removed or newly added during the episode!
+        #       Otherwise, you need padding history as well
+        mask_alive = self.is_padded == 0  # view the live agents only; 1: alive, 0: dead
+
+        # Get variables to plot
+        agents_trajectories = self.state_hist[:self.time_step, mask_alive, :2]  # [time_step, num_agents, 2(x,y)]
+        agents_velocities = self.state_hist[:self.time_step, mask_alive, 2:4]  # [time_step, num_agents, 2(vx,vy)]
+
+        # Plot the trajectories
+        for agent in range(agents_trajectories.shape[1]):
+            # Plot the trajectory of the agent_i as a solid line
+            ax_trajectory.plot(agents_trajectories[:, agent, 0], agents_trajectories[:, agent, 1], "-")
+            # Plot start position as green dot
+            ax_trajectory.plot(agents_trajectories[0, agent, 0], agents_trajectories[0, agent, 1], "go")
+            # Plot current position with velocity as red arrow
+            ax_trajectory.quiver(agents_trajectories[-1, agent, 0], agents_trajectories[-1, agent, 1],
+                                 agents_velocities[-1, agent, 0], agents_velocities[-1, agent, 1],
+                                 color="r", angles="xy", scale_units="xy", scale=1)
+        ax_trajectory.grid(True)
+        plt.draw()
+        plt.pause(0.001)
+
+        return fig_trajectory, ax_trajectory
+
+    def plot_current_agents(self, ax_current_agents=None, fig_current_agents=None):
+
+        # Create a new figure and axis if not provided
+        if ax_current_agents is None:
+            if fig_current_agents is None:
+                fig_current_agents, ax_current_agents = plt.subplots()
+            else:
+                ax_current_agents = fig_current_agents.add_subplot(111)
+
+        # Get mask for the agents that are alive
+        mask = self.is_padded == 0  # view the live agents only; 1: alive, 0: dead
+
+        # Get variables to plot
+        agents_positions = self.state_hist[self.time_step-1, mask, :2]  # [num_agents, 2(x,y)]
+        agents_velocities = self.state_hist[self.time_step-1, mask, 2:4]  # [num_agents, 2(vx,vy)]
+
+        # Compute the min and max coordinates considering both position and velocity vectors
+        min_point = np.min(agents_positions + agents_velocities, axis=0) - 1
+        max_point = np.max(agents_positions + agents_velocities, axis=0) + 1
+
+        # Initialize the plot
+        ax_current_agents.clear()
+        ax_current_agents.set_title("Current Agents")
+        ax_current_agents.set_xlabel("x")
+        ax_current_agents.set_ylabel("y")
+        ax_current_agents.set_aspect('equal', 'box')
+
+        # Create invisible boundary points to make the plot look better
+        # Note: this is a bit of a hack, but it works
+        ax_current_agents.plot([min_point[0], min_point[0]], [min_point[1], max_point[1]], alpha=0.0)
+
+        # Plot the agents
+        # Plot the positions as green dots
+        ax_current_agents.scatter(agents_positions[:, 0], agents_positions[:, 1], color="g")
+        # Plot the velocities as red arrows
+        ax_current_agents.quiver(agents_positions[:, 0], agents_positions[:, 1],
+                                 agents_velocities[:, 0], agents_velocities[:, 1],
+                                 color="r", angles="xy", scale_units="xy", scale=1)
+        ax_current_agents.grid(True)
+        plt.draw()
+        plt.pause(0.001)
+
+        return fig_current_agents, ax_current_agents
+
     def update_env_object(self, do_auto_step=False, use_custom_ray=False):  # for backward compatibility
         # Enables the old environment instance is compatible with the new version
         # when you use serialized environments of the old version in the new version.
@@ -893,5 +1055,3 @@ class LazyAgentsCentralized(gym.Env):
                 self.use_custom_ray = use_custom_ray
             else:
                 print("No num_agent, no num_agents? wtf!")
-
-
