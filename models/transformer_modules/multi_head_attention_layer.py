@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 
 class MultiHeadAttentionLayer(nn.Module):
+    # TODO: Hey! use right notations for d_k, d_v, d_model following the original transformer paper.
 
     def __init__(self, d_model, h, q_fc, kv_fc, out_fc, dr_rate=0):
         super(MultiHeadAttentionLayer, self).__init__()
@@ -60,7 +61,7 @@ class MultiHeadAttentionLayer(nn.Module):
         value = transform(value, self.v_fc)  # (n_batch, h, seq_len_key,   d_k)
 
         out = self.calculate_attention(query, key, value, mask)  # (n_batch, h,             seq_len_query,  d_k)
-        out = out.transpose(1, 2)                                # (n_batch, seq_len_query, h,              d_k)
+        out = out.transpose(1, 2)                     # (n_batch, seq_len_query, h,              d_k)
         out = out.contiguous().view(n_batch, -1, self.d_model)   # (n_batch, seq_len_query, d_model)
         out = self.out_fc(out)
 

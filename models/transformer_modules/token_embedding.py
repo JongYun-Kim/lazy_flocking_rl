@@ -20,6 +20,7 @@ class LinearEmbedding(nn.Module):
         super(LinearEmbedding, self).__init__()
         self.embedding = nn.Linear(d_env, d_embed)
         self.d_embed = d_embed
+        self.in_features = d_env
 
     def forward(self,
                 x  # shape: (batch_size, seq_len, d_env); d_env: dimension of ray environment observation to process
