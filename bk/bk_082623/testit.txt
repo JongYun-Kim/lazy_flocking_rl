@@ -1,0 +1,10 @@
+
+    # Get nn policy
+    # Get path
+    base_path = "<YOUR_DIR>"
+    trial_path = base_path + "/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47"  # the first emergent behavior (chkp74)
+    checkpoint_path = trial_path + "/checkpoint_000074/policies/default_policy"
+
+    # Get policy from checkpoint
+    policy = Policy.from_checkpoint(checkpoint_path)
+    policy.model.eval()
