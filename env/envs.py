@@ -70,6 +70,10 @@ class LazyAgentsCentralized(gym.Env):
                 "use_fixed_horizon": False,  # If True, the env will use fixed horizon. Default: False
                 "use_L2_norm": False,  # If True, the env will use L2 norm. Default: False
 
+                # Heuristic policy
+                "use_heuristics": False,  # If True, the env will use heuristic policy. Default: False
+                "_use_fixed_lazy_idx": True,  # If True, the env will use fixed lazy idx. Default: True
+
                 # Step mode
                 "auto_step": False,  # If True, the env will step automatically (i.e. episode length==1). Default: False
 
@@ -133,6 +137,10 @@ class LazyAgentsCentralized(gym.Env):
         self.use_fixed_horizon = self.config["use_fixed_horizon"] if "use_fixed_horizon" in self.config else False
         self.use_L2_norm = self.config["use_L2_norm"] if "use_L2_norm" in self.config else False
 
+        # Heuristic policy
+        self.use_heuristics = self.config["use_heuristics"] if "use_heuristics" in self.config else False
+        self._use_fixed_lazy_idx = self.config["_use_fixed_lazy_idx"] if "_use_fixed_lazy_idx" in self.config else True
+
         # Step mode
         self.do_auto_step = self.config["auto_step"] if "auto_step" in self.config else False
 
@@ -191,6 +199,13 @@ class LazyAgentsCentralized(gym.Env):
         self.time_step = None
         self.clock_time = None
 
+        # For heuristic policy
+        self.r_max = None
+        self.alpha = None
+        self.gamma = None
+        self.heuristic_fitness = None
+        self.fixed_lazy_idx = None
+
         # Check convergence
         self.std_pos_hist = None  # shape (self.max_time_step,)
         self.std_vel_hist = None  # shape (self.max_time_step,)
@@ -201,8 +216,9 @@ class LazyAgentsCentralized(gym.Env):
         self.num_agent_max = None
 
         # For plotting
-        self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
-            if self.get_state_hist else None
+        self.state_hist = None
+        # self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
+        #     if self.get_state_hist else None
 
     def reset(self):
         # Reset agent number
@@ -251,7 +267,20 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get initial state if needed
         if self.get_state_hist:
+            self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32)
             self.state_hist[self.time_step, :, :] = self.agent_states
+
+        # Update r_max
+        if self.use_heuristics:
+            mask = self.is_padded == 0
+            self.r_max = np.zeros((self.num_agents_max,), dtype=np.float32)
+            self.alpha, self.gamma = self.update_r_max_and_get_alpha_n_gamma(mask=mask, init_update=True)
+            self.fixed_lazy_idx = np.argmax(self.alpha * self.gamma)
+            assert isinstance(self.fixed_lazy_idx, np.int64)
+            assert mask[self.fixed_lazy_idx]  # make sure if the agent is alive
+        if not self._use_fixed_lazy_idx:
+            for _ in range(4):
+                print("    The env uses variable lazy index !!!  Not recommended but for testing purposes !!!")
 
         return observation
 
@@ -603,6 +632,10 @@ class LazyAgentsCentralized(gym.Env):
 
         std_pos = self.std_pos_hist[self.time_step]
         std_vel = self.std_vel_hist[self.time_step]
+
+        # Update r_max, alpha, and gamma for the heuristic policy, if neccessary
+        if self.use_heuristics:
+            self.alpha, self.gamma = self.update_r_max_and_get_alpha_n_gamma(mask=mask)
 
         # Update the clock time and the time step count
         self.clock_time += self.dt
@@ -1174,6 +1207,89 @@ class LazyAgentsCentralized(gym.Env):
             else:
                 print("No num_agent, no num_agents? wtf!")
 
+    def compute_heuristic_action(self, mask=None, use_fixed_lazy=None):
+        # This method computes the heuristic action based on the current state.
+
+        # Get mask
+        mask = self.is_padded == 0 if mask is None else mask
+
+        # Get fitness vector
+        self.heuristic_fitness = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        self.heuristic_fitness[mask] = self.alpha[mask] * self.gamma[mask]  # shape: (num_agents_max,)
+        # Assert the fitness is in the range [0, 1] unless self.time_step==0
+        if self.time_step > 0:
+            assert np.all(0 <= self.heuristic_fitness) and np.all(self.heuristic_fitness <= 1)
+
+        # Get who's lazy: index of the lazy agent (highest fitness)
+        use_fixed_lazy = self._use_fixed_lazy_idx if use_fixed_lazy is None else use_fixed_lazy
+        if use_fixed_lazy:
+            lazy_agent_idx = self.fixed_lazy_idx
+        else:
+            lazy_agent_idx = np.argmax(self.heuristic_fitness)  # shape: (,)
+        # Assert the lazy agent is alive
+        assert mask[lazy_agent_idx]
+
+        # Get the laziness value of the lazy agent (sole-lazy heuristic in this case)
+        G = 0.8  # gain from the paper; prevents C_lazy(t) from decreasing near zero
+        # Assert the laziness is in the range [0, 1-G]
+        if self.time_step > 0:
+            laziness = 1 - G * self.heuristic_fitness[lazy_agent_idx]  # shape: (,)
+            assert 1-G <= laziness <= 1
+        elif self.time_step == 0:
+            laziness = 1-G  # starts from 1-G (minimum laziness)
+        else:
+            raise ValueError(f"self.time_step must be non-negative! But self.time_step=={self.time_step}")
+
+        # Get lazy action
+        lazy_action = np.zeros((self.num_agents_max,), dtype=np.float32)
+        lazy_action[mask] = 1.0  # locally fully active
+        lazy_action[lazy_agent_idx] = laziness  # assigns the laziness to the lazy agent
+
+        return lazy_action
+
+    def update_r_max_and_get_alpha_n_gamma(self, mask=None, init_update=False):
+        # Get mask
+        # Make sure to use the mask for the live agents only; arr[mask] shows the living agents only
+        mask = self.is_padded == 0 if mask is None else mask
+
+        # Get center coordinates
+        center = np.mean(self.agent_pos[mask, :], axis=0)  # shape: (2,)
+
+        # Get current r
+        r_vec = np.zeros((self.num_agents_max, 2), dtype=np.float32)  # shape: (num_agents_max, 2)
+        r_vec[mask, :] = center - self.agent_pos[mask, :]
+        r = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        r[mask] = np.linalg.norm(r_vec[mask, :], axis=1)
+
+        # Update max r
+        self.r_max = np.maximum(self.r_max, r)  # shape: (num_agents_max,)
+
+        # Get alpha
+        alpha = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        if init_update:  # self.time_step == 0:
+            alpha[mask] = r[mask]
+        else:
+        # elif self.time_step > 0:
+            alpha[mask] = r[mask] / self.r_max[mask]
+        # else:
+        #     raise ValueError(f"self.time_step must be non-negative! But self.time_step=={self.time_step}")
+
+        # Get current v
+        v_vec = np.zeros((self.num_agents_max, 2), dtype=np.float32)  # shape: (num_agents_max, 2)
+        v_vec[mask, :] = self.agent_vel[mask, :]
+        v = self.v  # must be a scalar
+
+        # Get gamma from gamma = 0.5*(1-cos(phi)), where cos(phi) = |v_vec * r_vec| / (|v_vec|*|r_vec|)
+        cos_phi = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        cos_phi[mask] = np.sum(v_vec[mask] * r_vec[mask], axis=1) / (v * r[mask])
+        gamma = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        gamma[mask] = 0.5 * (1 - cos_phi[mask])
+        # Clip gamma to be in the range [0, 1]
+        # Note: this is necessary because of the floating point error; fking precision issues
+        gamma[mask] = np.clip(gamma[mask], 0, 1)
+
+        return alpha, gamma
+
 
 class LazyAgentsCentralizedDiscrete(LazyAgentsCentralized):
 
@@ -1440,9 +1556,9 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         # vel_error_reward = - (1/15) * np.maximum(std_vel_error, 0.0)
 
         # Get auxiliary reward
-        w_con = 1.0 * 0.01
-        w_pos = 1.0 * 0.81
-        w_vel = 1.0 * 0.27
+        w_con = 1.0 * 0.018
+        w_pos = 1.0 * 1.0
+        w_vel = 1.0 * 0.18
         auxiliary_reward = (
                 w_con * control_reward +
                 w_pos * pos_error_reward +
@@ -1451,3 +1567,27 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
 
         return auxiliary_reward
 
+
+class LazyEnvTemp(LazyAgentsCentralizedPendReward):
+
+    def interpret_action(self, model_output, mask):
+        # This method is used to interpret the action
+        # Please override this method in your task
+
+        # Interpretation: model_output -> interpreted_action
+        interpreted_action = 0.5 * (1 - model_output)  # from [-1, 1] to [1, 0]
+        # Validation: interpreted_action -> c_lazy
+        interpreted_and_validated_action = self.validate_action(interpreted_action, mask)
+
+        return interpreted_and_validated_action
+
+    def validate_action(self, interpreted_action, mask):
+        # This method is used to validate the action
+        # Please override this method in your task and include it in the interpret_action method
+
+        # Clip the interpreted action into the laziness range
+        laziness_lower_bound = 0
+        laziness_upper_bound = 1
+        interpreted_and_validated_action = np.clip(interpreted_action, laziness_lower_bound, laziness_upper_bound)
+
+        return interpreted_and_validated_action
