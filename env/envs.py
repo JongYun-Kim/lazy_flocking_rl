@@ -14,25 +14,8 @@ class LazyAgentsCentralized(gym.Env):
     - Note (2): with the default settings, the maximum number of time steps was 1814 in the test
     - Note (3): with the default settings, the average number of time steps was 572.4 in the test
     """
-    # TODO (0): [x] Should we use RELATIVE position and angle as the embeddings (observation)?
-    # TODO (1): [o] Check agent update method (t vs t+1)
-    # TODO (2): [△] Check if the reference variables in the state changes after assignment (e.g. self.is_padded)
-    #   TODO (2-1): [o] Fully connected network cases -> working; ok!
-    #   TODO (2-2): [o] No changes in the network topology -> working; ok!
-    #   TODO (2-3): [x] Network changes -> not working; yet! (basics are implemented tho...)
-    # TODO (3): [△] Determine the terminal condition
-    #   TODO (3-1): [o] Check the paper's method
-    #   TODO (3-2): [o] Check the code's method:
-    #                   (1) position error, (2) changes in std of pos and (3) vel in the pas 50 iters
-    # TODO (4): [x] Normalize the state, particularly with respect to the agents' initial positions
-    # TODO (5): [x] Normalize the reward, particularly with respect to the number of agents
-    # TODO (6): [ing] Add comments of every array's shape
-    # TODO (7): [x] Take control of the data types! np.int32 or np.float32!
-    # TODO (8): [Pending] Include checking if there's a network separation
-    # TODO (9): [o] Implement angle WRAPPING <- not necessary as we use the relative angle and sin/cos(θ)
-    #               just added the function to the env class (wrapped_ang = self.wrap_to_pi(ang))
-    # TODO (10): [o] Configuration template
-    # TODO (11): [o] Allow auto_step as well as the norminal step, single_step
+    # TODO: [x] data types: 64-bit float/integer to support actions from an outer scope (e.g. RLlib)
+    # TODO: [x] use dataclass for config instead of dict! (type-safer and more readable; lighter init)
 
     def __init__(self, config):
         """
@@ -179,7 +162,7 @@ class LazyAgentsCentralized(gym.Env):
             self.observation_space = Dict({
                 "agent_embeddings": Box(low=low_bound_all_agents, high=high_bound_all_agents,
                                         shape=(self.num_agents_max, self.d_v), dtype=np.float32),
-                "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
+                # "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
                 "pad_tokens": Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.int32),
             })
         self.is_padded = None  # 1 if the task is padded, 0 otherwise; shape (num_agents_max,)
@@ -196,6 +179,8 @@ class LazyAgentsCentralized(gym.Env):
         self.center_in_star_net = None  # center agent index of star network; shape (1,)? or ()
         self.u_lazy = None  # control input; shape (num_agents_max,)  == self.u before
         self.u_fully_active = None  # control input; shape (num_agents_max,) in fully active control
+        # u_decomposed: (u_cs, u_coh)
+        self.u_fully_active_decomposed = None  # control input; shape (num_agents_max, 2) in fully active control
         self.time_step = None
         self.clock_time = None
 
@@ -220,6 +205,17 @@ class LazyAgentsCentralized(gym.Env):
         # self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
         #     if self.get_state_hist else None
 
+        # Seed
+        self.seed_value = None
+
+    def seed(self, seed=None):
+        self.seed_value = seed
+        np.random.seed(seed)
+        super().seed(seed)
+
+    def get_seed(self):
+        return self.seed_value
+
     def reset(self):
         # Reset agent number
         self.num_agents = np.random.randint(self.num_agents_min, self.num_agents_max + 1)
@@ -242,7 +238,10 @@ class LazyAgentsCentralized(gym.Env):
         # (4) angular velocity; shape (num_agents_max, 1); it's a 2-D array !!!!
         self.agent_omg = np.zeros((self.num_agents_max, 1))
 
-        self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max, dtype=np.float32))
+        # self.u_fully_active: shape (num_agents_max,)
+        # self.u_fully_active_decomposed: shape (num_agents_max, 2)  # Keep the shape in your mind!
+        # self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max, dtype=np.float32))
+        self.u_fully_active, self.u_fully_active_decomposed = self.get_u(get_decomposed_u=True)
 
         # Pad agent states: it concatenates agent states with padding
         self.agent_states = self.pad_states()
@@ -291,8 +290,8 @@ class LazyAgentsCentralized(gym.Env):
         else:
             agent_embeddings = self.agent_states[:, :self.d_v]
 
-            # Get network topology
-            net_topology = self.net_topology_full
+            # # Get network topology
+            # net_topology = self.net_topology_full
 
             # Get padding tokens
             pad_tokens = self.is_padded
@@ -300,7 +299,7 @@ class LazyAgentsCentralized(gym.Env):
             # Get observation in a dict
             obs = {
                 "agent_embeddings": agent_embeddings,
-                "net_topology": net_topology,
+                # "net_topology": net_topology,
                 "pad_tokens": pad_tokens,
             }
 
@@ -387,7 +386,7 @@ class LazyAgentsCentralized(gym.Env):
         # Get the preprocessed observation in a dict
         obs_preprocessed = {
             "agent_embeddings": agent_embeddings_transformed_unmasked,
-            "net_topology": self.net_topology_full,
+            # "net_topology": self.net_topology_full,
             "pad_tokens": self.is_padded,
         }
 
@@ -600,14 +599,20 @@ class LazyAgentsCentralized(gym.Env):
         #   Be careful! the control input uses the previous state (i.e. x_t, y_t, vx_t, vy_t, θ_t)
         #     This is because the current state may not be observable
         #     (e.g. in a decentralized network; forward compatibility)
-        # self.u_lazy = self.update_u(c_lazy, mask=mask)  # state transition 1/2
-        self.u_lazy = self.u_fully_active * c_lazy  # state transition 1/2
+        # self.u_lazy = self.update_u(c_lazy, mask=mask)  # state transition 1/2  # outdated
+        # self.u_lazy = self.u_fully_active * c_lazy  # state transition 1/2  # outdated; implemented in the next line
+        self.u_lazy = self.apply_laziness(
+            c_lazy=c_lazy,
+            u_fully_active=self.u_fully_active,
+            u_fully_active_decomposed=self.u_fully_active_decomposed
+        )
 
         # Update the state (==agent_embeddings) based on the control input
         self.update_state(u=self.u_lazy, mask=mask)  # state transition 2/2
 
         # Get observation
-        self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max), mask=mask)  # next_fully_active_control
+        # self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max), mask=mask)  # next_fully_active_control
+        self.u_fully_active, self.u_fully_active_decomposed = self.get_u(mask=mask, get_decomposed_u=True)
         obs = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)  # next_observation
 
         # Get state history: get it before updating the time step (overriding the initial state from the reset method)
@@ -619,9 +624,6 @@ class LazyAgentsCentralized(gym.Env):
         done = True if self.is_done_in_paper(mask=mask) else False
 
         # Compute reward
-        # TODO: When should we compute reward?
-        #  1. After updating the network topology (i.e. after changing the agent loss and gain)
-        #  2. Before updating the network topology (i.e. before changing the agent loss and gain) <- current option
         rewards = self.compute_reward()
         rewards = self.penalize_incomplete_task(rewards)
         # if not isinstance(rewards, np.ndarray):
@@ -633,7 +635,7 @@ class LazyAgentsCentralized(gym.Env):
         std_pos = self.std_pos_hist[self.time_step]
         std_vel = self.std_vel_hist[self.time_step]
 
-        # Update r_max, alpha, and gamma for the heuristic policy, if neccessary
+        # Update r_max, alpha, and gamma for the heuristic policy, if necessary
         if self.use_heuristics:
             self.alpha, self.gamma = self.update_r_max_and_get_alpha_n_gamma(mask=mask)
 
@@ -670,6 +672,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Interpretation: model_output -> interpreted_action
         interpreted_action = model_output
+        # Mask out the padding agents (only when it needs to be masked out for efficiency)
+        if self.num_agents < self.num_agents_max:
+            interpreted_action = model_output.copy()  # Ray requires a copy
+            interpreted_action[~mask] = 0
         # Validation: interpreted_action -> c_lazy
         interpreted_and_validated_action = self.validate_action(interpreted_action, mask)
 
@@ -685,6 +691,15 @@ class LazyAgentsCentralized(gym.Env):
         interpreted_and_validated_action = np.clip(interpreted_action, laziness_lower_bound, laziness_upper_bound)
 
         return interpreted_and_validated_action
+
+    def apply_laziness(self, c_lazy, u_fully_active, u_fully_active_decomposed):
+        # This defines how to generate u_lazy from the given c_lazy from the model and the u_fa_s from the control law
+        # Please extend this method for your needs
+
+        # Here, we get u_lazy = c_lazy * u_fa
+        u_lazy = u_fully_active * c_lazy
+
+        return u_lazy
 
     def compute_auxiliary_reward(  # should not be static when overriding
             self,
@@ -712,8 +727,11 @@ class LazyAgentsCentralized(gym.Env):
         #
         return NotImplemented
 
-    def update_u(self, c, mask=None, _w_ang=None, _w_pos=None):
+    def update_u(self, c, mask=None, _w_ang=None, _w_pos=None):  # Has been deprecated !!!!!!! use get_u instead !!!!!!!
         # c: laziness; shape: (num_agents_max,)
+        # mask: mask for the non-padding agents; shape: (num_agents_max,)
+        # _w_ang: angular weight; shape: (num_agents_max,)
+        # _w_pos: positional weight; shape: (num_agents_max,)
 
         # Get mask
         mask = self.is_padded == 0 if mask is None else mask
@@ -772,7 +790,7 @@ class LazyAgentsCentralized(gym.Env):
         u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # shape: (num_agents,)
 
         # 3. Compute separation control input
-        # TODO: implement separation control input when it is needed; for now, no separation control input
+        # TO!DO!: implement separation control input when it is needed; for now, no separation control input
         # u_sep =
 
         # 4. Compute communication control input
@@ -782,7 +800,7 @@ class LazyAgentsCentralized(gym.Env):
         # 5. Compute control input
         w_ang = _w_ang[mask] if _w_ang is not None else 1  # supposed to be a numpy array but use scalar for efficiency
         w_pos = _w_pos[mask] if _w_pos is not None else 1
-        u_local = w_ang*u_cs + w_pos*u_coh  # + u_sep + u_comm  # shape: (num_agents,)
+        u_local = w_ang * u_cs + w_pos * u_coh  # + u_sep + u_comm  # shape: (num_agents,)
         # Saturation
         u_local = np.clip(u_local, -self.u_max, self.u_max)  # shape: (num_agents,)
         # Consider laziness
@@ -797,6 +815,102 @@ class LazyAgentsCentralized(gym.Env):
         # print(rel_ang[0, :].reshape(4, 5))
 
         return u  # shape: (num_agents_max,)
+
+    def get_u(self, mask=None, get_decomposed_u=False):
+        # mask: mask for the non-padding agents; shape: (num_agents_max,)
+        # get_decomposed_u: if True, returns u_decomposed; otherwise, returns u
+
+        # Get mask
+        mask = self.is_padded == 0 if mask is None else mask
+        assert mask.dtype == np.bool  # np.bool_ depending on your ray (or numpy) version
+        assert np.sum(mask) == self.num_agents  # TODO: remove the asserts once the code is stable
+
+        # Get variables (local infos)
+        # rel_pos ((x_j-x_i), (y_j-y_i)): relative position; shape: (num_agents, num_agents, 2)
+        # rel_dist (r_ij): relative distance; all positive (0 inc); shape: (num_agents, num_agents)
+        rel_pos, rel_dist = self.get_relative_info(self.agent_pos, get_dist=True, mask=mask, get_local=True)
+        # rel_ang (θ_j - θ_i): relative angle; shape: (num_agents, num_agents): 2D (i.e. dist info)
+        _, rel_ang = self.get_relative_info(self.agent_ang, get_dist=True, mask=mask, get_local=True)
+        # rel_vel ((vx_j-vx_i), (vy_j-vy_i)): relative velocity; shape: (num_agents, num_agents, 2)
+        rel_vel, _ = self.get_relative_info(self.agent_vel, get_dist=False, mask=mask, get_local=True)
+
+        # 1. Compute alignment control input
+        # u_cs = (lambda/n(N_i)) * sum_{j in N_i}[ psi(r_ij)sin(θ_j - θ_i) ],
+        # where N_i is the set of neighbors of agent i,
+        # psi(r_ij) = 1/(1+r_ij^2)^(beta),
+        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
+        psi = (1 + rel_dist ** 2) ** (-self.beta)  # shape: (num_agents, num_agents)
+        alignment_error = np.sin(rel_ang)  # shape: (num_agents, num_agents)
+        Neighbors = self.view_adjacency_matrix(mask=mask)  # shape: (num_agents, num_agents); from full network topology
+        # u_cs: shape: (num_agents,)
+        u_cs = (self.lambda_ / Neighbors.sum(axis=1)) * (Neighbors * psi * alignment_error).sum(axis=1)
+
+        # 2. Compute cohesion control input
+        # u_coh[i] = (sigma/N*V)
+        #            * sum_(j in N_i)
+        #               [
+        #                   {
+        #                       (K1/(2*r_ij^2))*<-rel_vel, -rel_pos> + (K2/(2*r_ij^2))*(r_ij-R)
+        #                   }
+        #                   * <[-sin(θ_i), cos(θ_i)]^T, rel_pos>
+        #               ]
+        # where N_i is the set of neighbors of agent i,
+        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
+        # rel_vel = (vx_j - vx_i, vy_j - vy_i),
+        # rel_pos = (x_j - x_i, y_j - y_i),
+        sig_NV = self.sigma / (self.v * Neighbors.sum(axis=1))  # shape: (num_agents,)
+        r_ij = rel_dist + (np.eye(self.num_agents) * np.finfo(float).eps)  # shape: (num_agents, num_agents)
+        k1_2rij2 = self.k1 / (2 * r_ij ** 2)  # shape: (num_agents, num_agents)
+        k2_2rij = self.k2 / (2 * r_ij)  # shape: (num_agents, num_agents)
+        v_dot_p = np.einsum('ijk,ijk->ij', rel_vel, rel_pos)  # shape: (num_agents, num_agents)
+        rij_R = rel_dist - self.R  # shape: (num_agents, num_agents)
+        ang_vec = np.concatenate([-np.sin(self.agent_ang[mask]), np.cos(self.agent_ang[mask])], axis=1)  # (num_a, 2)
+        ang_vec = np.tile(ang_vec[:, np.newaxis, :], (1, self.num_agents, 1))  # (num_agents, num_agents, 2)
+        ang_dot_p = np.einsum('ijk,ijk->ij', ang_vec, rel_pos)  # shape: (num_agents, num_agents)
+        need_sum = (k1_2rij2 * v_dot_p + k2_2rij * rij_R) * ang_dot_p  # shape: (num_agents, num_agents)
+        u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # shape: (num_agents,)
+
+        # 3. Compute separation control input
+        # TODO: implement separation control input when it is needed; for now, no separation control input
+        # u_sep =
+
+        # 4. Compute communication control input
+        # Not implemented yet as we use fixed communication topology (regardless of actual distances)
+        # u_comm =
+
+        # 5. Compute control input
+        if not get_decomposed_u:
+            u_local = u_cs + u_coh  # + u_sep + u_comm  # shape: (num_agents,)
+            # Saturation
+            u_local = np.clip(u_local, -self.u_max, self.u_max)  # shape: (num_agents,)
+            # Get u
+            u = np.zeros(self.num_agents_max, dtype=np.float32)  # shape: (num_agents_max,)
+            u[mask] = u_local
+
+            return u  # shape: (num_agents_max,)
+        else:
+            # Define local control inputs (decomposed and summed)
+            u_local_decomposed = np.stack((u_cs, u_coh), axis=1)  # shape: (num_agents, 2)
+            u_local_sum = np.sum(u_local_decomposed, axis=1)  # shape: (num_agents,)
+
+            # Find the agents where the sum exceeds the maximum allowable control input
+            mask_exceed = np.abs(u_local_sum) > self.u_max  # shape: (num_agents,)
+            # Note: u_local_sum[mask_exceed] never includes zero elements once self.u_max is set to a non-zero value
+            # So, it's safe to divide something by u_local_sum[mask_exceed]
+
+            # Scale down the u_local components for those agents
+            scaling_factor = self.u_max / np.abs(u_local_sum[mask_exceed])  # shape: (num_agents,) > 0
+            u_local_decomposed[mask_exceed] *= scaling_factor[:, np.newaxis]  # shape: (num_agents, 2)
+            # Update u_local_sum (==saturation)
+            u_local_sum = np.sum(u_local_decomposed, axis=1)  # shape: (num_agents,)
+
+            # Get u
+            u = np.zeros(self.num_agents_max, dtype=np.float32)  # shape: (num_agents_max,)
+            u_decomposed = np.zeros((self.num_agents_max, 2), dtype=np.float32)  # shape: (num_agents_max, 2)
+            u[mask] = u_local_sum
+            u_decomposed[mask] = u_local_decomposed
+
+            return u, u_decomposed  # shape: (num_agents_max,)
 
     def get_relative_info(self, data, get_dist=False, mask=None, get_local=False):
         # Returns the relative information of the agents (e.g. relative position, relative angle, etc.)
@@ -1528,6 +1642,14 @@ class LazyAgentsCentralizedStdReward(LazyAgentsCentralized):
 
 class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
 
+    def __init__(self, config):
+        super().__init__(config)
+
+        # Get pendulum reward weight from config
+        self.w_control = self.config["w_control"] if "w_control" in self.config else 0.001
+        self.w_pos = self.config["w_pos"] if "w_pos" in self.config else 1.0
+        self.w_vel = self.config["w_vel"] if "w_vel" in self.config else 0.2
+
     def compute_auxiliary_reward(  # should not be static when overriding
             self,
             *,  # enforce keyword arguments to avoid confusion
@@ -1556,9 +1678,9 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         # vel_error_reward = - (1/15) * np.maximum(std_vel_error, 0.0)
 
         # Get auxiliary reward
-        w_con = 1.0 * 0.018
-        w_pos = 1.0 * 1.0
-        w_vel = 1.0 * 0.18
+        w_con = 1.0 * self.w_control  # 0.02
+        w_pos = 1.0 * self.w_pos  # 1.0
+        w_vel = 1.0 * self.w_vel  # 0.2
         auxiliary_reward = (
                 w_con * control_reward +
                 w_pos * pos_error_reward +
@@ -1591,3 +1713,92 @@ class LazyEnvTemp(LazyAgentsCentralizedPendReward):
         interpreted_and_validated_action = np.clip(interpreted_action, laziness_lower_bound, laziness_upper_bound)
 
         return interpreted_and_validated_action
+
+
+# class LazyAgentsCentralizedDecomposedLazy(LazyAgentsCentralized):
+class LazyAgentsCentralizedDecomposedLazy(LazyAgentsCentralizedPendReward):
+
+    def __init__(self, config):
+        super().__init__(config)  # single inheritance
+
+        # Renew the action space
+        self.action_space = Box(low=0, high=1, shape=(2*self.num_agents_max,), dtype=np.float32)
+
+    def interpret_action(self, model_output, mask):
+        # This method is used to interpret the action from the model output
+        # model_output: shape: (2 * num_agents_max,)
+        #               > [0:num_agents_max] -> u_lazy_cs  (ang)
+        #               > [num_agents_max: ] -> u_lazy_coh (pos)
+        # mask: shape: (num_agents_max,)
+
+        # Interpretation: model_output -> split it into u_lazy_cs and u_lazy_coh -> interpreted_action
+        u_lazy_cs = model_output[:self.num_agents_max]  # shape: (num_agents_max,)
+        u_lazy_coh = model_output[self.num_agents_max:]  # shape: (num_agents_max,)
+        # # Mask out the padding agents
+        # if self.num_agents < self.num_agents_max:
+        #     u_lazy_cs[~mask] = 0  # WARNING: it's not a copy; it changes model_output as well !!!
+        #     u_lazy_coh[~mask] = 0
+        # Get the interpreted action
+        # interpreted_action: shape: (num_agents_max, 2)
+        interpreted_action = np.stack((u_lazy_cs, u_lazy_coh), axis=1)  # shape: (num_agents_max, 2)
+        # Mask out the padding agents
+        interpreted_action[~mask, :] = 0
+
+        # Validation: interpreted_action -> c_lazy
+        interpreted_and_validated_action = self.validate_action(interpreted_action, mask)  # clipping: [0, 1]
+
+        return interpreted_and_validated_action
+
+    def apply_laziness(self, c_lazy, u_fully_active, u_fully_active_decomposed):
+        # This defines how to generate u_lazy from the given c_lazy from the model and the u_fa_s from the control law
+        # c_lazy: shape: (num_agents_max, 2)
+        # u_fully_active_decomposed: shape: (num_agents_max, 2)
+
+        # Get u_lazy_decomposed
+        u_lazy_decomposed = c_lazy * u_fully_active_decomposed  # shape: (num_agents_max, 2)
+        # Get u_lazy
+        u_lazy = np.sum(u_lazy_decomposed, axis=1)  # shape: (num_agents_max,)
+
+        return u_lazy
+
+    def get_observation(self, get_preprocessed_obs, mask=None):
+
+        # Get agent embeddings
+        if get_preprocessed_obs:
+            obs = self.preprocess_obs(mask=mask)
+        else:
+            agent_embeddings = self.agent_states[:, :self.d_v]
+
+            # # Get network topology
+            # net_topology = self.net_topology_full
+
+            # Get padding tokens
+            pad_tokens = self.is_padded
+
+            # Get observation in a dict
+            obs = {
+                "agent_embeddings": agent_embeddings,
+                # "net_topology": net_topology,
+                "pad_tokens": pad_tokens,
+            }
+
+        # Replace the last two data dim of obs["agent_embeddings"] with the decomposed fully active controls
+        # obs: [x, y, v_x, v_y, u_cs, u_coh]
+        obs["agent_embeddings"][:, 4:6] = self.u_fully_active_decomposed
+
+        if self.normalize_obs:
+            # Normalize the positions by the half of the length of boundary
+            obs["agent_embeddings"][:, :2] = obs["agent_embeddings"][:, :2] / (self.l_bound / 2.0)
+            # Normalize the velocities by the maximum velocity
+            obs["agent_embeddings"][:, 2:4] = obs["agent_embeddings"][:, 2:4] / self.v
+            # Normalize the u_cs and u_coh by u_max
+            obs["agent_embeddings"][:, 4:6] = obs["agent_embeddings"][:, 4:6] / self.u_max
+
+        if self.use_mlp_settings:
+            # Use only agent_embeddings
+            obs = obs["agent_embeddings"][:, :self.d_v]  # shape (num_agents_max, d_v)
+            # Flatten the observation
+            obs = obs.flatten()  # shape (num_agents_max * d_v,)
+
+        return obs
+
