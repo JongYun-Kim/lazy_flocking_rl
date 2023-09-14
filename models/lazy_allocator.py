@@ -15,6 +15,7 @@ from ray.rllib.models.torch.misc import SlimFC, normc_initializer
 # Python modules
 import numpy as np
 import gym
+from gym.spaces import Tuple, Box
 from typing import Dict, List, Union
 
 # Custom modules
@@ -597,7 +598,7 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
     ) -> None:
 
         agent_embeddings = obs["agent_embeddings"]  # (batch_size, num_agents_max, d_subobs)
-        net_topology = obs["net_topology"]  # (batch_size, num_agents_max, num_agents_max)
+        # net_topology = obs["net_topology"]  # (batch_size, num_agents_max, num_agents_max)
         pad_tokens = obs["pad_tokens"]  # (batch_size, num_agents_max)
 
         num_agents_max = pad_tokens.shape[1]
@@ -616,10 +617,10 @@ class MyRLlibTorchWrapper(TorchModelV2, nn.Module):
         # Check if all the padded data is 0
         assert torch.all(agent_embeddings[pad_mask, :] == 0), "all the padded data in agent_embeddings must be 0"
 
-        # Check if net_topology is a torch.Tensor
-        assert isinstance(net_topology, torch.Tensor), "net_topology must be a torch.Tensor"
-        # Check if net_topology is a 3D tensor
-        assert net_topology.ndim == 3, "net_topology must be a 3D tensor"
+        # # Check if net_topology is a torch.Tensor
+        # assert isinstance(net_topology, torch.Tensor), "net_topology must be a torch.Tensor"
+        # # Check if net_topology is a 3D tensor
+        # assert net_topology.ndim == 3, "net_topology must be a 3D tensor"
 
         # Check if pad_tokens is a torch.Tensor
         assert isinstance(pad_tokens, torch.Tensor), "obs must be a torch.Tensor"
@@ -1106,4 +1107,310 @@ class MyRLlibTorchWrapperControl(TorchModelV2, nn.Module):
         #     print("Debugging...")
         return out
 
+
+# class LazinessAllocatorWithValueToken()
+
+
+class MySACLazyQModelMLP(TorchModelV2, nn.Module):
+
+    def __init__(
+        self,
+        obs_space,
+        action_space,
+        num_outputs: int,
+        model_config: ModelConfigDict,
+        name: str,
+        **kwargs,
+    ):
+        """
+        # Configuration template
+        # "custom_model_config": {
+        #     "hidden_sizes": [256, 256],
+        #     "activation_fn": "relu",
+        # },
+        """
+
+        nn.Module.__init__(self)
+        super().__init__(obs_space, action_space, num_outputs, model_config, name)
+
+        # Get model config
+        if model_config is not None:
+            hidden_sizes = model_config["custom_model_config"]["hidden_sizes"] \
+                if "hidden_sizes" in model_config["custom_model_config"] else [512, 512]
+            assert isinstance(hidden_sizes, list), "hidden_sizes must be a list"
+            assert len(hidden_sizes) >= 2, "hidden_sizes must have at least 2 elements"
+            self.fc_activation = model_config["custom_model_config"]["activation_fn"] \
+                if "activation_fn" in model_config["custom_model_config"] else "relu"
+        else:
+            raise ValueError("model_config must be specified")
+
+        # Define layers
+        num_hidden_layers = len(hidden_sizes)
+        layers = []
+        prev_layer_size = obs_space.shape[0]
+        for i in range(num_hidden_layers):
+            layers.append(
+                SlimFC(
+                    in_size=prev_layer_size,
+                    out_size=hidden_sizes[i],
+                    initializer=normc_initializer(1.0),
+                    activation_fn=self.fc_activation,
+                )
+            )
+            prev_layer_size = hidden_sizes[i]
+        layers.append(
+            SlimFC(
+                in_size=prev_layer_size,
+                out_size=num_outputs,
+                initializer=normc_initializer(1.0),
+                activation_fn=None,
+            )
+        )
+        self.fc_net = nn.Sequential(*layers)
+
+        # Check observation space
+        if isinstance(obs_space, Box) and len(obs_space.shape) == 1:
+            self.concat_obs_and_actions = True
+            # raise ValueError("obs_space must be a Tuple; Others, not supported yet")
+            # I feel like this is the case because we already flattened the obs in the env
+            # , resulting in a Box(d_obs*num_agents_max)
+        else:
+            assert isinstance(obs_space, Tuple), "obs_space must be a Tuple"
+            assert len(obs_space.spaces) == 2, "obs_space must be a Tuple of 2 elements"
+            self.concat_obs_and_actions = False
+            raise ValueError("Not supported yet; At q model init")
+
+    def forward(
+        self,
+        input_dict: Dict[str, TensorType],
+        state: List[TensorType],
+        seq_lens: TensorType,
+    ) -> (TensorType, List[TensorType]):
+
+        # Fetch the observation and action
+        obs_and_action = input_dict["obs"]
+        if self.concat_obs_and_actions:
+            obs = obs_and_action
+        else:
+            obs_dict = obs_and_action[0]
+            obs = obs_dict["agent_embeddings"]  # (batch_size, num_agents_max, d_subobs)
+            action = obs_and_action[1]
+            # flatten it later...
+            raise ValueError("Not supported yet")
+
+        # Forward pass through fc_net
+        x = self.fc_net(obs)
+
+        return x, state
+
+
+class MySACLazyPolicyModelMLP(TorchModelV2, nn.Module):
+
+    def __init__(
+        self,
+        obs_space,
+        action_space,
+        num_outputs: int,
+        model_config: ModelConfigDict,
+        name: str,
+        **kwargs,
+    ):
+        """
+        # Configuration template
+        # "custom_model_config": {
+        #     "hidden_sizes": [512, 512],
+        #     "activation_fn": "relu",
+        #     "action_upper_bound": 1.05,
+        #     "log_std_upper_bound": -2,
+        # },
+        """
+
+        nn.Module.__init__(self)
+        super().__init__(obs_space, action_space, num_outputs, model_config, name)
+
+        # Get model config
+        if model_config is not None:
+            hidden_sizes = model_config["custom_model_config"]["hidden_sizes"] \
+                if "hidden_sizes" in model_config["custom_model_config"] else [512, 512]
+            assert isinstance(hidden_sizes, list), "hidden_sizes must be a list"
+            assert len(hidden_sizes) >= 2, "hidden_sizes must have at least 2 elements"
+            self.fc_activation = model_config["custom_model_config"]["activation_fn"] \
+                if "activation_fn" in model_config["custom_model_config"] else "relu"
+            self.action_upper_bound = model_config["custom_model_config"]["action_upper_bound"] \
+                if "action_upper_bound" in model_config["custom_model_config"] else 1.05
+            self.log_std_upper_bound = model_config["custom_model_config"]["log_std_upper_bound"] \
+                if "log_std_upper_bound" in model_config["custom_model_config"] else -2
+            assert self.action_upper_bound >= 1.0, "action_upper_bound must be >= 1.0"
+            assert self.log_std_upper_bound <= 0.0, "log_std_upper_bound must be <= 0.0"
+        else:
+            raise ValueError("model_config must be specified")
+
+        # Define layers
+        num_hidden_layers = len(hidden_sizes)
+        layers = []
+        prev_layer_size = obs_space.shape[0]
+        for i in range(num_hidden_layers):
+            layers.append(
+                SlimFC(
+                    in_size=prev_layer_size,
+                    out_size=hidden_sizes[i],
+                    initializer=normc_initializer(1.0),
+                    activation_fn=self.fc_activation
+                )
+            )
+            prev_layer_size = hidden_sizes[i]
+        layers.append(
+            SlimFC(
+                in_size=prev_layer_size,
+                out_size=num_outputs,  # mean and std == 2 * action_size
+                initializer=normc_initializer(1.0),
+                activation_fn=None,
+            )
+        )
+        self.fc_net = nn.Sequential(*layers)
+
+        self.mean_size = int(num_outputs/2)
+        self.logstd_size = int(num_outputs/2)
+        assert self.mean_size + self.logstd_size == num_outputs, "num_outputs must be even!"
+
+    def forward(
+        self,
+        input_dict: Dict[str, TensorType],
+        state: List[TensorType],
+        seq_lens: TensorType,
+    ) -> (TensorType, List[TensorType]):
+
+        obs = input_dict["obs"]
+        batch_size = obs.shape[0]
+        assert len(obs.shape) == 2, "obs must be a 2D tensor"
+
+        logits_raw = self.fc_net(obs)
+        assert logits_raw.shape == (batch_size, self.num_outputs), "logits shape is not correct!"
+
+        # Split logits_raw into mean and log_std
+        mean_raw = logits_raw[:, :self.mean_size]
+        log_std_raw = logits_raw[:, self.logstd_size:]
+
+        # Pass mean_raw through tanh to get mean in the range;
+        # range of mean: [0, upper_bound]
+        mean_tanhed = self.get_new_range_from_tanhed(mean_raw, 0, self.action_upper_bound)
+
+        # Pass log_std_raw through tanh to get log_std in the range;
+        # range of log_std: [-10, upper_bound]
+        log_std_tanhed = self.get_new_range_from_tanhed(log_std_raw, -10, self.log_std_upper_bound)
+
+        # Concat mean and log_std
+        logits_tanhed = torch.cat([mean_tanhed, log_std_tanhed], dim=1)
+        assert logits_tanhed.shape == (batch_size, self.num_outputs), "logits shape is not correct!"
+
+        # Return
+        return logits_tanhed, state
+
+    @staticmethod
+    def get_new_range_from_tanhed(tanhed_tensor, lower_bound, upper_bound):
+        """
+        Get a new range from tanhed_tensor
+        """
+        return tanhed_tensor * (upper_bound - lower_bound) / 2 + (upper_bound + lower_bound) / 2
+
+
+class MyRLlibTorchWrapperDecomposedLazy(MyRLlibTorchWrapper):
+
+    def __init__(
+            self,
+            obs_space,
+            action_space,
+            num_outputs: int,
+            model_config: ModelConfigDict,
+            name: str,
+            **kwargs,
+    ):
+        """
+                # Configuration template
+                # "custom_model_config": {
+                #     "d_subobs": 6,
+                #     "d_embed_input": 128,
+                #     "d_embed_context": 128,
+                #     "d_model": 128,
+                #     "d_model_decoder": 128,
+                #     "n_layers_encoder": 3,
+                #     "n_layers_decoder": 2,
+                #     "num_heads": 8,
+                #     "d_ff": 512,
+                #     "d_ff_decoder": 512,
+                #     "clip_action_mean": 1.0,  # [0, clip_action_mean]
+                #     "clip_action_log_std": 10.0,  # [-clip_action_log_std, -2]
+                #     "dr_rate": 0.1,
+                #     "norm_eps": 1e-5,
+                #     "is_bias": True,
+                #     "share_layers": True,
+                #     "use_residual_in_decoder": True,
+                #     "use_FNN_in_decoder": True,
+                #     "use_deterministic_action_dist": False,
+                # },
+        """
+
+        super().__init__(obs_space, action_space, num_outputs, model_config, name, **kwargs)
+
+        # Get model 1: cs_lazy model
+        self.cs_lazy_model = self.policy_network
+        # Get model 2: coh_lazy model
+        self.coh_lazy_model = copy.deepcopy(self.policy_network)
+
+        # Get value branch
+        d_embed_context = model_config["custom_model_config"]["d_embed_context"]
+        d_value = 2 * d_embed_context  # cs_lazy and coh_lazy; concat and pass through
+        self.value_branch = nn.Sequential(
+            nn.Linear(in_features=d_value, out_features=d_value),
+            nn.ReLU(),
+            # nn.Linear(in_features=d_value, out_features=d_value),
+            # nn.ReLU(),
+            nn.Linear(in_features=d_value, out_features=1),  # state-value function
+        )
+
+    def forward(
+        self,
+        input_dict: Dict[str, TensorType],
+        state: List[TensorType],
+        seq_lens: TensorType,
+    ) -> (TensorType, List[TensorType]):
+
+        obs = input_dict["obs"]
+
+        # Check validity of the data incoming from the environment
+        # TODO: deactivate this for better performance once the model is stable in your trials
+        self._validate_obs(obs)
+
+        # Extract obs_cs and obs_coh from obs (batch_size, num_agents_max, d_subobs)
+        # obs["agent_embeddings"] = [x, y, v_x, v_y, u_cs, u_coh]
+        # obs_cs["agent_embeddings"] = [x, y, v_x, v_y, u_cs]
+        # obs_coh["agent_embeddings"] = [x, y, v_x, v_y, u_coh]
+        obs_cs = obs
+        obs_coh = copy.deepcopy(obs)
+        obs_cs["agent_embeddings"] = obs_cs["agent_embeddings"][:, :, :5]  # (batch_size, num_agents_max, 5)
+        obs_coh["agent_embeddings"] = obs_coh["agent_embeddings"][:, :, [0, 1, 2, 3, 5]]
+
+        # x_cs: (batch_size, 2 * action_size); action_size==num_UAVs==num_agents_max
+        # h_c_N1_cs: (batch_size, 1, d_embed_context)
+        # x_coh: (batch_size, 2 * action_size); action_size==num_UAVs==num_agents_max
+        # h_c_N1_coh: (batch_size, 1, d_embed_context)
+        if self.share_layers:
+            x_cs, h_c_N1_cs, h_c_N_cs = self.cs_lazy_model(obs_cs)
+            x_coh, h_c_N1_coh, h_c_N_coh = self.coh_lazy_model(obs_coh)
+            # self.values = torch.cat([h_c_N_cs.squeeze(1), h_c_N_coh.squeeze(1)], dim=1)
+            self.values = torch.cat([h_c_N1_cs.squeeze(1), h_c_N1_coh.squeeze(1)], dim=1)
+        else:
+            x_cs, _, _ = self.cs_lazy_model(obs_cs)
+            x_coh, _, _ = self.coh_lazy_model(obs_coh)
+            # input of the value branch is h_c_N instead of h_c_N1 in the case of shared layers
+            self.values = torch.cat([self.value_network(obs_cs)[2].squeeze(1),
+                                     self.value_network(obs_coh)[2].squeeze(1)], dim=1)
+        # Check if self.values is a 2D tensor
+        assert len(self.values.shape) == 2, "self.values must be a 2D tensor: (batch_size, 2*d_embed_context)"
+
+        # Concat x_cs and x_coh
+        x = torch.cat([x_cs, x_coh], dim=1)  # (batch_size, 2 * action_size * 2)==(batch_size, 2 * num_UAVs * 2)
+
+        # Return
+        return x, state
 
