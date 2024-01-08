@@ -189,7 +189,7 @@ class LazyAgentsCentralized(gym.Env):
         self.alpha = None
         self.gamma = None
         self.heuristic_fitness = None
-        self.fixed_lazy_idx = None
+        self.initial_lazy_indices = None
 
         # Check convergence
         self.std_pos_hist = None  # shape (self.max_time_step,)
@@ -274,9 +274,9 @@ class LazyAgentsCentralized(gym.Env):
             mask = self.is_padded == 0
             self.r_max = np.zeros((self.num_agents_max,), dtype=np.float32)
             self.alpha, self.gamma = self.update_r_max_and_get_alpha_n_gamma(mask=mask, init_update=True)
-            self.fixed_lazy_idx = np.argmax(self.alpha * self.gamma)
-            assert isinstance(self.fixed_lazy_idx, np.int64)
-            assert mask[self.fixed_lazy_idx]  # make sure if the agent is alive
+            self.initial_lazy_indices = np.argsort(-self.alpha * self.gamma)  # shape: (num_agents_max)
+            # assert isinstance(self.fixed_lazy_indices, np.int64)
+            # assert np.all(mask[self.initial_lazy_indices])  # make sure if the agents are alive
         if not self._use_fixed_lazy_idx:
             for _ in range(4):
                 print("    The env uses variable lazy index !!!  Not recommended but for testing purposes !!!")
@@ -310,6 +310,7 @@ class LazyAgentsCentralized(gym.Env):
         if self.normalize_obs:
             # Normalize the positions by the half of the length of boundary
             obs["agent_embeddings"][:, :2] = obs["agent_embeddings"][:, :2] / (self.l_bound / 2.0)
+            # obs["agent_embeddings"][:, :2] = obs["agent_embeddings"][:, :2] / 125.0  # use trained val at eval
             # Normalize the velocities by the maximum velocity
             obs["agent_embeddings"][:, 2:4] = obs["agent_embeddings"][:, 2:4] / self.v
             # Normalize the anngle by pi
@@ -582,6 +583,27 @@ class LazyAgentsCentralized(gym.Env):
 
         return obs, episode_reward, done, info
 
+    def auto_step_fully_active(self):
+        # auto_step with fully active actions (array with ones for alive agents, zeros for dead agents)
+
+        # Define fully active action
+        fully_active_action = self.get_fully_active_action()
+
+        # Call auto_step
+        obs, episode_reward, done, info = self.auto_step(fully_active_action)
+
+        return obs, episode_reward, done, info
+
+    def get_fully_active_action(self):
+        # Get fully active action (array with ones for alive agents, zeros for dead agents)
+        # Please override this method if you want to use a different fully active action    `
+
+        # Define fully active action
+        fully_active_action = np.ones(self.num_agents_max)
+        fully_active_action[self.is_padded == 1] = 0
+
+        return fully_active_action
+
     def single_step(self,
                     action: np.ndarray,
                     ):
@@ -601,11 +623,17 @@ class LazyAgentsCentralized(gym.Env):
         #     (e.g. in a decentralized network; forward compatibility)
         # self.u_lazy = self.update_u(c_lazy, mask=mask)  # state transition 1/2  # outdated
         # self.u_lazy = self.u_fully_active * c_lazy  # state transition 1/2  # outdated; implemented in the next line
-        self.u_lazy = self.apply_laziness(
+        u_lazy_wo_disturbance = self.apply_laziness(
             c_lazy=c_lazy,
             u_fully_active=self.u_fully_active,
-            u_fully_active_decomposed=self.u_fully_active_decomposed
+            u_fully_active_decomposed=self.u_fully_active_decomposed,
+            mask=mask
         )
+        # Get disturbance
+        u_noise = self.get_disturbance(u_lazy=u_lazy_wo_disturbance, mask=mask)
+
+        # Apply disturbance
+        self.u_lazy = u_lazy_wo_disturbance if u_noise is NotImplemented else u_lazy_wo_disturbance + u_noise
 
         # Update the state (==agent_embeddings) based on the control input
         self.update_state(u=self.u_lazy, mask=mask)  # state transition 2/2
@@ -692,7 +720,7 @@ class LazyAgentsCentralized(gym.Env):
 
         return interpreted_and_validated_action
 
-    def apply_laziness(self, c_lazy, u_fully_active, u_fully_active_decomposed):
+    def apply_laziness(self, c_lazy, u_fully_active, u_fully_active_decomposed, mask):
         # This defines how to generate u_lazy from the given c_lazy from the model and the u_fa_s from the control law
         # Please extend this method for your needs
 
@@ -700,6 +728,10 @@ class LazyAgentsCentralized(gym.Env):
         u_lazy = u_fully_active * c_lazy
 
         return u_lazy
+
+    def get_disturbance(self, u_lazy, mask):
+        # Extend your disturbance mechanism (here, it's an placeholder; identity process)
+        return NotImplemented
 
     def compute_auxiliary_reward(  # should not be static when overriding
             self,
@@ -981,7 +1013,7 @@ class LazyAgentsCentralized(gym.Env):
         self.agent_vel[mask] = self.v * np.concatenate(
             [np.cos(self.agent_ang[mask]), np.sin(self.agent_ang[mask])], axis=1)
 
-        # # (2-2) Update position:  # TODO: POSITION UPDATE CHANGED!!
+        # # (2-2) Update position:  # TODO: POSITION UPDATE CHANGED!! (If used)
         # # >>  p_{t+1} = p_t + v_t * dt;  Be careful: v_t is the velocity at time t+1, not t
         # self.agent_pos[mask] = self.agent_pos[mask] + self.agent_vel[mask] * self.dt
 
@@ -1112,9 +1144,12 @@ class LazyAgentsCentralized(gym.Env):
 
         # 1. Check position standard deviation
         pos_converged = True if pos_std < self.std_pos_converged else False
+        vel_converged = True if vel_std < self.std_vel_converged else False
+        std_val_converged = True if pos_converged and vel_converged else False
 
         # Check 2 and 3 only if the position standard deviation is smaller than the threshold
-        if pos_converged and not self.use_fixed_horizon:
+        # if pos_converged and not self.use_fixed_horizon:
+        if std_val_converged and not self.use_fixed_horizon:
             # Only proceed if there have been at least 50 time steps
             if self.time_step >= 49:
                 # 2. Check change in position standard deviation
@@ -1198,7 +1233,7 @@ class LazyAgentsCentralized(gym.Env):
 
         return fig_std_hist, ax_std_hist
 
-    def plot_trajectory(self, ax_trajectory=None, fig_trajectory=None):
+    def plot_trajectory(self, ax_trajectory=None, fig_trajectory=None, title_str=None):
         # Typical usage: self.plot_trajectory(ax, fig)
 
         # Create a new figure and axis if not provided
@@ -1215,7 +1250,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Plot the trajectory
         ax_trajectory.clear()
-        ax_trajectory.set_title("Trajectory")
+        if title_str is None:
+            ax_trajectory.set_title("Trajectory")
+        else:
+            ax_trajectory.set_title(f"Trajectory ({title_str})")
         ax_trajectory.set_xlabel("x")
         ax_trajectory.set_ylabel("y")
         ax_trajectory.set_aspect('equal', 'box')
@@ -1321,7 +1359,52 @@ class LazyAgentsCentralized(gym.Env):
             else:
                 print("No num_agent, no num_agents? wtf!")
 
-    def compute_heuristic_action(self, mask=None, use_fixed_lazy=None):
+    def compute_heuristic_action(self, mask=None, use_fixed_lazy=None, num_lazy_agents=1):
+        # This method computes the heuristic action based on the current state.
+
+        # Get mask
+        mask = self.is_padded == 0 if mask is None else mask  # shape: (num_agents_max,)
+
+        # Get fitness vector
+        self.heuristic_fitness = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        self.heuristic_fitness[mask] = self.alpha[mask] * self.gamma[mask]  # shape: (num_agents_max,)
+        # Assert the fitness is in the range [0, 1] unless self.time_step==0
+        if self.time_step > 0:
+            assert np.all(0 <= self.heuristic_fitness) and np.all(self.heuristic_fitness <= 1)
+
+        # Get who's lazy: index of the lazy agent (highest fitness)
+        assert (num_lazy_agents == 1) or (isinstance(num_lazy_agents, int) and num_lazy_agents > 1),\
+            "Invalid value for num_lazy_agents"
+        assert num_lazy_agents <= self.num_agents  # do NOT request non-existing lazy agents
+        use_fixed_lazy = self._use_fixed_lazy_idx if use_fixed_lazy is None else use_fixed_lazy
+
+        if use_fixed_lazy:
+            top_lazy_agent_indices = self.initial_lazy_indices[:num_lazy_agents]  # shape: (num_lazy_agents,)
+        else:  # `-`: for descending order; shape: (num_lazy_agents,)
+            top_lazy_agent_indices = np.argsort(-self.heuristic_fitness)[:num_lazy_agents]
+        # Assert the lazy agent is alive
+        assert np.all(mask[top_lazy_agent_indices])
+
+        # Get the laziness value of the lazy agent (sole-lazy heuristic in this case)
+        G = 0.8  # gain from the paper; prevents C_lazy(t) from decreasing near zero
+        # Assert the laziness is in the range [0, 1-G]
+        eps = 1e-7  # to prevent numerical errors
+        if self.time_step > 0:
+            laziness_values = 1 - G * self.heuristic_fitness[top_lazy_agent_indices]  # shape: (num_lazy_agents,)
+            assert np.all(1 - G - eps <= laziness_values) and np.all(laziness_values <= 1 + eps)
+        elif self.time_step == 0:  # shape: (num_lazy_agents,)
+            laziness_values = np.full(num_lazy_agents, 1 - G)  # starts from 1-G (minimum laziness for all)
+        else:
+            raise ValueError(f"self.time_step must be non-negative! But self.time_step=={self.time_step}")
+
+        # Get lazy action
+        lazy_action = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        lazy_action[mask] = 1.0  # locally fully active
+        lazy_action[top_lazy_agent_indices] = laziness_values  # assigns the laziness to the lazy agents
+
+        return lazy_action
+
+    def compute_heuristic_action_bk(self, mask=None, use_fixed_lazy=None, num_lazy_agents=1):
         # This method computes the heuristic action based on the current state.
 
         # Get mask
@@ -1335,6 +1418,8 @@ class LazyAgentsCentralized(gym.Env):
             assert np.all(0 <= self.heuristic_fitness) and np.all(self.heuristic_fitness <= 1)
 
         # Get who's lazy: index of the lazy agent (highest fitness)
+        assert (num_lazy_agents == 1) or (isinstance(num_lazy_agents, int) and num_lazy_agents > 1),\
+            "Invalid value for num_lazy_agents"
         use_fixed_lazy = self._use_fixed_lazy_idx if use_fixed_lazy is None else use_fixed_lazy
         if use_fixed_lazy:
             lazy_agent_idx = self.fixed_lazy_idx
@@ -1646,9 +1731,10 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         super().__init__(config)
 
         # Get pendulum reward weight from config
-        self.w_control = self.config["w_control"] if "w_control" in self.config else 0.001
-        self.w_pos = self.config["w_pos"] if "w_pos" in self.config else 1.0
-        self.w_vel = self.config["w_vel"] if "w_vel" in self.config else 0.2
+        # Note: the defualt value is not optimal; they were determined for backward compatibility
+        self.w_control = self.config["w_control"] if "w_control" in self.config else 0.02  # 0.001
+        self.w_pos = self.config["w_pos"] if "w_pos" in self.config else 1.0  # 1.0
+        self.w_vel = self.config["w_vel"] if "w_vel" in self.config else 0.2  # 0.2
 
     def compute_auxiliary_reward(  # should not be static when overriding
             self,
@@ -1801,4 +1887,57 @@ class LazyAgentsCentralizedDecomposedLazy(LazyAgentsCentralizedPendReward):
             obs = obs.flatten()  # shape (num_agents_max * d_v,)
 
         return obs
+
+
+class LazyAgentsWithDisturbance(LazyAgentsCentralized):
+
+    def __init__(self, config):
+        super().__init__(config=config)
+
+        # Get new configs
+        self.noise_scale = self.config["noise_scale"] if "noise_scale" in self.config else 0.1
+        self.num_faulty_agents = self.config["num_faulty_agents"] if "num_faulty_agents" in self.config \
+            else self.num_agents_max  # default: all agents are faulty
+        # Validate num_faulty_agents falls into the range of [1, num_agents_max]
+        assert 1 <= self.num_faulty_agents <= self.num_agents_max, \
+            "num_faulty_agents must be in the range of [1, num_agents_max]!"
+        # Validate num_faulty_agents is an integer
+        assert isinstance(self.num_faulty_agents, int), "num_faulty_agents must be an integer!"
+
+        # Set partial_faulty from config
+        self.partial_faulty = True if self.num_faulty_agents < self.num_agents_max else False  # default: True
+        # Set faulty_agents_one_hot vector
+        self.faulty_agents_one_hot = None  # shape: (num_agents_max,)
+
+    def reset(self):
+        # Get the initial state
+        obs = super().reset()
+
+        # Validate num_faulty_agents <= num_agents
+        # alternatively, use num_agents_min instead without an assertion (use if statement)
+        assert self.num_faulty_agents <= self.num_agents, "num_faulty_agents must be less than or equal to num_agents!"
+
+        # Get initial faulty agents indices
+        # WARNING: assumption: num_agents does not change during an episode
+        #          if it does, we need to update the faulty agents indices based on the current alive agents
+        # generate one-hot vector; faulty agents are 1, otherwise 0  (int!!)
+        self.faulty_agents_one_hot = np.zeros((self.num_agents_max,), dtype=np.int32)  # shape: (num_agents_max,)
+        self.faulty_agents_one_hot[:self.num_faulty_agents] = 1
+
+        return obs
+
+    def get_disturbance(self, u_lazy, mask):
+        # Apply an additive noise onto u
+        # u_lazy: shape: (num_agents_max,)  # in this particular case, it's not used as we don't consider scale noise
+
+        # Get mask of the faulty agents
+        mask_faulty = self.faulty_agents_one_hot.astype(np.bool_)  # np.bool instead if not working
+
+        # Initialize the noise
+        u_noise = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
+        # Apply the masks sequentially and set the noise
+        u_noise[mask] = np.random.normal(loc=0, scale=self.noise_scale, size=(self.num_agents,))
+        u_noise[~mask_faulty] = 0  # Set noise to 0 for non-faulty agents
+
+        return u_noise  # shape: (num_agents_max,); only faulty agents have non-zero noise
 
