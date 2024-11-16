@@ -20,6 +20,7 @@ from datetime import datetime  # gets current date and time
 if __name__ == "__main__":
     num_agents_max = 25
     num_agents_min = 15
+    max_time_step = 1000
     env_config_heuristic = {
         "num_agents_max": num_agents_max,  # Maximum number of agents
         "num_agents_min": num_agents_min,  # Minimum number of agents
@@ -31,7 +32,7 @@ if __name__ == "__main__":
         "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
         "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
         "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
-        "max_time_step": 1000,  # Maximum time steps. Default is 2000,
+        "max_time_step": max_time_step,  # Maximum time steps. Default is 2000,
         "incomplete_episode_penalty": -0,  # Penalty for incomplete episode. Default is -600
         "normalize_obs": True,  # If True, the env will normalize the obs. Default: False\
         "use_fixed_horizon": False,  # If True, the env will use fixed horizon. Default: False
@@ -66,9 +67,9 @@ if __name__ == "__main__":
 
     # Get nn policy
     # Get path
-    base_path = ".../ray_results/your_experiment_name_fron_tune"
-    trial_path = base_path + "/your_trial_name"  # the first emergent behavior (chkp74)
-    checkpoint_path = trial_path + "/checkpoint_<your_checkpoint_num_to_test>/policies/default_policy"
+    base_path = "../../bk/bk_082623"
+    trial_path = base_path + "../PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47"  # the first emergent behavior (chkp74)
+    checkpoint_path = trial_path + "/checkpoint_000074/policies/default_policy"
 
     # Get policy from checkpoint
     policy = Policy.from_checkpoint(checkpoint_path)

@@ -1,7 +1,2 @@
-# lazy_flocking_rl
+# ACS Flocking with Lazy Agents
 
-add env
-add model
-
-add experiments
-add data

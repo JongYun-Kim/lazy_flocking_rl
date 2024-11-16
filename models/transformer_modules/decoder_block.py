@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.nn as nn
 
-from transformer_modules.residual_connection_layer import ResidualConnectionLayer, IdentityResidualLayer, \
+from models.transformer_modules.residual_connection_layer import ResidualConnectionLayer, IdentityResidualLayer, \
     NoResidualButSameForward
 
 
