@@ -1,11 +1,15 @@
 import gym
 from gym.spaces import Box, Dict, Discrete
+from gym.utils import seeding
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')  # To avoid the MacOS backend; but just follow your needs
 
+# Compatibility layer for np.bool_ and np.bool
+if not hasattr(np, 'bool_'):
+    np.bool_ = np.bool
 
 class LazyAgentsCentralized(gym.Env):
     """
@@ -212,6 +216,10 @@ class LazyAgentsCentralized(gym.Env):
         self.seed_value = seed
         np.random.seed(seed)
         super().seed(seed)
+
+    # def seed(self, seed=None):
+    #     self.np_random, seed = seeding.np_random(seed)
+    #     return [seed]
 
     def get_seed(self):
         return self.seed_value
@@ -645,7 +653,8 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get state history: get it before updating the time step (overriding the initial state from the reset method)
         if self.get_state_hist:
-            self.state_hist[self.time_step, :, :] = self.agent_states
+            if self.time_step < self.max_time_step-1:
+                self.state_hist[self.time_step+1, :, :] = self.agent_states
 
         # Check if done,
         # done = True if self.is_done(mask=mask) else False
