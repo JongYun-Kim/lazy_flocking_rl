@@ -108,25 +108,23 @@ if __name__ == "__main__":
     # Iterate over Episodes (Experiments)
     start_time = datetime.now()
     for episode in range(num_episodes):
-        # Seed
+        # Reset the Env with a new seed
         seed = int(seeds[episode])
-
-        # Reset the Env
         env_org.seed(seed)
         obs = env_org.reset()
-        action_hist = np.zeros((max_time_step, num_agents_max), dtype=np.float32)
 
         for algo in algos:
             env = copy.deepcopy(env_org)  # uses the same seed for each algo
             # Run the algorithm here (example)
             reward_sum = 0
             episode_length = None # Initialize episode length
+            action_hist = np.zeros((max_time_step, num_agents_max), dtype=np.float32)
             for t in range(max_time_step):
                 # Action and state update logic would go here (pseudo-code)
                 action = get_action_from_algo(algo, obs, env, policy)
-                next_obs, reward, done, info = env.step(action)
+                obs, reward, done, info = env.step(action)
                 reward_sum += reward
-                action_hist[t] = action
+                action_hist[t, :] = action
 
                 if done and episode_length is None:
                     episode_length = t + 1
@@ -145,9 +143,9 @@ if __name__ == "__main__":
 
     # Print the time taken
     end_time = datetime.now()
-    print("\n    Time taken: ", end_time - start_time)
+    time_taken = end_time - start_time
+    print("\n    Time taken: ", time_taken)
     # Now `results` contains organized data for each algorithm and episode
-
 
     # Save the Data
     # # 저장할 데이터: 알고리즘별(ACS, Heuristic, RL)로 나누어서 같이 저장
@@ -178,6 +176,7 @@ if __name__ == "__main__":
         pickle.dump(results, f)
         pickle.dump(seeds, f)
         pickle.dump(env_config, f)
+        pickle.dump(time_taken, f)
         print(f"Data saved at {os.path.join(save_dir, file_name)}")
 
     print("Data saved successfully at ", os.path.join(save_dir, file_name))
