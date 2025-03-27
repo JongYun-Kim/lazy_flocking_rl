@@ -3,6 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from datetime import datetime
+import numpy as np
 
 
 # Use a built-in matplotlib style for a cleaner look. (Check your plt version)
@@ -52,26 +53,32 @@ for ep in range(num_episodes):
         ax_control = axs[row, 0] if len(algos) > 1 else axs[0]
         ax_laziness = axs[row, 1] if len(algos) > 1 else axs[1]
 
+        time_axis = np.linspace(0.1, 100.0, num=control_hist.shape[0])
+
         # --- Plot Control History ---
         for agent in range(num_agents_max):
-            ax_control.plot(control_hist[:, agent],
-                            color=agent_colors[agent],
-                            alpha=0.8,
-                            linewidth=1.5)
-        ax_control.set_title(f"Control History - {algo}", fontsize=12)
-        ax_control.set_xlabel("Time Step", fontsize=10)
-        ax_control.set_ylabel("Control Input", fontsize=10)
+            # ax_control.plot(control_hist[:, agent],
+            #                 color=agent_colors[agent],
+            #                 alpha=0.8,
+            #                 linewidth=1.5)
+            ax_control.plot(time_axis, control_hist[:, agent], color=agent_colors[agent], alpha=0.8, linewidth=1.5)
+        ax_control.set_title(f"Control Inputs Changes - {algo}", fontsize=14)
+        # ax_control.set_xlabel("Time Step", fontsize=12)
+        ax_control.set_xlabel("Time (s)", fontsize=12)
+        ax_control.set_ylabel("Control Input", fontsize=12)
         ax_control.grid(True)
 
         # --- Plot Laziness History (1 - Action) ---
         for agent in range(num_agents_max):
-            ax_laziness.plot(laziness_hist[:, agent],
-                             color=agent_colors[agent],
-                             alpha=0.8,
-                             linewidth=1.5)
-        ax_laziness.set_title(f"Laziness History - {algo}", fontsize=12)
-        ax_laziness.set_xlabel("Time Step", fontsize=10)
-        ax_laziness.set_ylabel("Laziness", fontsize=10)
+            # ax_laziness.plot(laziness_hist[:, agent],
+            #                  color=agent_colors[agent],
+            #                  alpha=0.8,
+            #                  linewidth=1.5)
+            ax_laziness.plot(time_axis, laziness_hist[:, agent], color=agent_colors[agent], alpha=0.8, linewidth=1.5)
+        ax_laziness.set_title(f"Laziness Changes - {algo}", fontsize=14)
+        # ax_laziness.set_xlabel("Time Step", fontsize=12)
+        ax_laziness.set_xlabel("Time (s)", fontsize=12)
+        ax_laziness.set_ylabel("Laziness", fontsize=12)
         ax_laziness.grid(True)
 
     # plt.suptitle(f"Episode {ep+1}", fontsize=16)
