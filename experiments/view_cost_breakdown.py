@@ -55,7 +55,7 @@ def plot_stacked_costs(agents, control_costs, time_costs):
     plt.show()
 
 def plot_individual_cost(agents, cost_data, cost_type='control'):
-    assert cost_type in ['control', 'time'], "cost_type must be 'control' or 'time'"
+    assert cost_type in ['Control Cost', 'Convergence Time'], "cost_type must be 'Control Cost ' or 'Convergence Time'"
 
     x = np.arange(len(agents))
     bar_width = 0.25
@@ -76,8 +76,8 @@ def plot_individual_cost(agents, cost_data, cost_type='control'):
 
     plt.xticks(x, agents)
     plt.xlabel('Number of Agents', fontsize=12, fontweight='bold')
-    plt.ylabel(f'{cost_type.capitalize()} Cost', fontsize=12, fontweight='bold')
-    plt.title(f'{cost_type.capitalize()} Cost by Algorithm and Number of Agents', fontsize=14, fontweight='bold')
+    plt.ylabel(f'{cost_type.capitalize()}', fontsize=12, fontweight='bold')
+    plt.title(f'{cost_type.capitalize()} by Algorithm and Number of Agents', fontsize=14, fontweight='bold')
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     plot_stacked_costs(agents, control_costs, time_costs)
 
     # 2. Control Cost만 따로
-    plot_individual_cost(agents, control_costs, cost_type='control')
+    plot_individual_cost(agents, control_costs, cost_type='Control Cost')
 
     # 3. Time Cost만 따로
-    plot_individual_cost(agents, time_costs, cost_type='time')
+    plot_individual_cost(agents, time_costs, cost_type='Convergence Time')
