@@ -123,13 +123,14 @@ for ep in range(num_episodes):
             # Set titles only for the top row
             if row == 0:
                 if col == 0:
-                    ax.set_title("0 s", fontsize=18)
+                    ax.set_title("0 s", fontsize=16)
                 else:
-                    ax.set_title(f"{t / 10:g} s", fontsize=18)
+                    ax.set_title(f"{t / 10:g} s", fontsize=16)
 
             # Set y-axis labels only for the leftmost column
             if col == 0:
                 ax.set_ylabel(algo, fontsize=20, fontweight='bold')
+                ax.tick_params(axis='y', labelsize=16)
             else:
                 # Hide y-axis tick labels for inner columns
                 ax.tick_params(labelleft=False)
@@ -137,6 +138,8 @@ for ep in range(num_episodes):
             # Hide x-axis tick labels for all but the bottom row
             if row < len(algos) - 1:
                 ax.tick_params(labelbottom=False)
+            else:
+                ax.tick_params(axis='x', labelsize=16)
 
             ax.grid(True)
             ax.set_xlim(x_min - padding, x_max + padding)
