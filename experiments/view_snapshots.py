@@ -75,21 +75,22 @@ cmap = plt.cm.hot_r
 norm = plt.Normalize(vmin=0, vmax=1)
 
 for ep in range(num_episodes):
-    fig, axs = plt.subplots(len(algos), num_snapshots, figsize=(4 * num_snapshots, 4 * len(algos)))
+    fig, axs = plt.subplots(len(algos), num_snapshots, figsize=(16, 17))
     fig.patch.set_facecolor('white')
 
     # --- Determine plot bounds for consistent scaling across all snapshots in this episode ---
     x_min, x_max, y_min, y_max = float('inf'), float('-inf'), float('inf'), float('-inf')
     for algo in algos:
         state_hist = results[algo]["state_hists"][ep]
-        x_min = -110
+        x_min = -135
         # x_max = max(x_max, state_hist[:, :, 0].max())
-        x_max = 300
-        y_min = min(y_min, state_hist[:, :, 1].min())
+        x_max = 155
+        # y_min = min(y_min, state_hist[:, :, 1].min())
+        y_min = -120
         # y_max = max(y_max, state_hist[:, :, 1].max())
-        y_max = 620
+        y_max = 505
 
-    padding = 100  # Add some padding to the plot boundaries
+    padding = 8  # Add some padding to the plot boundaries
 
     for row, algo in enumerate(algos):
         state_hist = results[algo]["state_hists"][ep]
@@ -97,7 +98,7 @@ for ep in range(num_episodes):
 
         for col, t in enumerate(snapshot_times):
             ax = axs[row, col]
-            ax.set_facecolor('darkgray')
+            ax.set_facecolor('lightgray')
 
             # Plot trajectories up to the current time step, colored by laziness
             for agent_idx in range(num_agents_max):
@@ -122,13 +123,13 @@ for ep in range(num_episodes):
             # Set titles only for the top row
             if row == 0:
                 if col == 0:
-                    ax.set_title("0s")
+                    ax.set_title("0 s", fontsize=18)
                 else:
-                    ax.set_title(f"{t / 10:g}s", fontsize=14)
+                    ax.set_title(f"{t / 10:g} s", fontsize=18)
 
             # Set y-axis labels only for the leftmost column
             if col == 0:
-                ax.set_ylabel(algo, fontsize=14, fontweight='bold')
+                ax.set_ylabel(algo, fontsize=20, fontweight='bold')
             else:
                 # Hide y-axis tick labels for inner columns
                 ax.tick_params(labelleft=False)
@@ -143,7 +144,7 @@ for ep in range(num_episodes):
             ax.set_aspect('equal', adjustable='datalim')
 
     # Adjust layout to make space for the colorbar and reduce space between plots
-    plt.subplots_adjust(wspace=0.2, hspace=0.1)  # This is overridden by tight_layout()
+    plt.subplots_adjust(wspace=0.1, hspace=0.05)  # This is overridden by tight_layout()
     # fig.tight_layout(rect=[0, 0, 0.94, 1]) # rect=[left, bottom, right, top]
 
     # Get the position of the axes
@@ -154,10 +155,11 @@ for ep in range(num_episodes):
     cbar_ax = fig.add_axes(
         [0.92, bottom_ax_pos.y0, 0.02, top_ax_pos.y1 - bottom_ax_pos.y0])  # [0.91, bottom, width, height]
     cbar = fig.colorbar(scatter, cax=cbar_ax)
-    cbar.set_label("Laziness", fontsize=12, fontweight='bold')
+    cbar.set_label("Laziness", fontsize=20, fontweight='bold')
+    cbar.ax.tick_params(labelsize=16)
 
     # Save the figure
-    output_file = os.path.join(output_dir, f"ep_{ep + 1}_all_snapshots_v4.png")
+    output_file = os.path.join(output_dir, f"ep_{ep + 1}_all_snapshots_v6.png")
     fig.savefig(output_file, dpi=300, facecolor=fig.get_facecolor(), edgecolor='none')
     plt.close(fig)
 
