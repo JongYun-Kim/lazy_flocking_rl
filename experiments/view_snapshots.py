@@ -16,7 +16,7 @@ snapshot_times = [1, 70, 200, 398]
 algos = ["ACS", "RL"]
 
 
-def plot_snapshot(ax, positions, headings, laziness_values, cmap, norm, arrow_len=12):
+def plot_snapshot(ax, positions, headings, laziness_values, cmap, norm, arrow_len=12, edge_color='blue', arrow_color='red'):
     """
     Plots a single snapshot of agent positions and headings on a given axis.
     Colors agents based on their laziness.
@@ -29,7 +29,7 @@ def plot_snapshot(ax, positions, headings, laziness_values, cmap, norm, arrow_le
         cmap=cmap,
         norm=norm,
         s=50,
-        edgecolors='blue',
+        edgecolors=edge_color,
         linewidths=1,
         zorder=3
     )
@@ -38,7 +38,7 @@ def plot_snapshot(ax, positions, headings, laziness_values, cmap, norm, arrow_le
     us = np.cos(headings) * arrow_len
     vs = np.sin(headings) * arrow_len
     ax.quiver(positions[:, 0], positions[:, 1], us, vs,
-              scale=0.5, scale_units='xy', width=0.01, color='red', zorder=4)
+              scale=0.5, scale_units='xy', width=0.01, color=arrow_color, zorder=4)
     return scatter
 
 
@@ -98,7 +98,7 @@ for ep in range(num_episodes):
 
         for col, t in enumerate(snapshot_times):
             ax = axs[row, col]
-            ax.set_facecolor('lightgray')
+            ax.set_facecolor('darkgray')
 
             # Plot trajectories up to the current time step, colored by laziness
             for agent_idx in range(num_agents_max):
@@ -117,7 +117,21 @@ for ep in range(num_episodes):
             laziness_at_t = laziness_hist[t, :]
 
             # Plot the snapshot
-            scatter = plot_snapshot(ax, positions, headings, laziness_at_t, cmap, norm)
+            # Define edge colors for each algorithm
+            algo_edge_colors = {
+                "ACS": 'C0',  # matplotlib 기본 파란색
+                "RL": 'C2',  # matplotlib 기본 초록색
+            }
+            scatter = plot_snapshot(
+                ax,
+                positions,
+                headings,
+                laziness_at_t,
+                cmap,
+                norm,
+                edge_color=algo_edge_colors.get(algo, 'blue'),  # 알고리즘 이름에 따라 색 선택
+                arrow_color=algo_edge_colors.get(algo, 'red'),
+            )
 
             # --- Manually control axis labels to mimic sharex/sharey ---
             # Set titles only for the top row
@@ -162,7 +176,7 @@ for ep in range(num_episodes):
     cbar.ax.tick_params(labelsize=16)
 
     # Save the figure
-    output_file = os.path.join(output_dir, f"ep_{ep + 1}_all_snapshots_v6.png")
+    output_file = os.path.join(output_dir, f"ep_{ep + 1}_all_snapshots_v7.png")
     fig.savefig(output_file, dpi=300, facecolor=fig.get_facecolor(), edgecolor='none')
     plt.close(fig)
 
