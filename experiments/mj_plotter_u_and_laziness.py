@@ -39,7 +39,7 @@ num_agents_max = results["ACS"]["control_hists"][0].shape[1]
 
 # Loop over each episode to create and save a figure.
 for ep in range(num_episodes):
-    if ep != 868:  # Only plot episode of the magic number 868 (for paper tbh).
+    if ep + 1 != 868:  # Only plot episode of the magic number 868 (for paper tbh).
         continue
     # Create a figure with one row per algorithm and two columns (control & laziness).
     fig, axs = plt.subplots(len(algos), 2, figsize=(14, 4 * len(algos)))

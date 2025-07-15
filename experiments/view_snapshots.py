@@ -87,7 +87,7 @@ num_snapshots = len(snapshot_times)
 
 # Setup colormap and normalization for laziness
 cmap = plt.cm.hot_r
-norm = CustomNormalize(data_min=0, data_max=1, color_min=0.02, color_max=0.72)
+norm = CustomNormalize(data_min=0, data_max=1, color_min=0.015, color_max=0.72)
 
 # Set y-axis limits for each algorithm
 y_limits = {
@@ -145,7 +145,7 @@ for ep in range(num_episodes):
             )
 
             if row == 0:
-                ax.set_title(f"{t / 10:g} s" if col != 0 else "0 s", fontsize=16)
+                ax.set_title(f"{t / 10:g} s" if col != 0 else "0 s", fontsize=20)
             if col == 0:
                 ax.set_ylabel(algo, fontsize=20, fontweight='bold')
                 ax.tick_params(axis='y', labelsize=16)
