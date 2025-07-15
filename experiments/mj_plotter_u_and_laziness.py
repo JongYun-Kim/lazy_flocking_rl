@@ -76,23 +76,29 @@ for ep in range(num_episodes):
         # for agent in range(num_agents_max):
         for agent in reversed(range(num_agents_max)):
             ax_control.plot(time_axis, control_hist[:, agent], color=agent_colors[agent], alpha=1.0, linewidth=1.5)
-        ax_control.set_title(f"Control Inputs Changes - {algo}", fontsize=14)
-        ax_control.set_xlabel("Time (s)", fontsize=12)
-        ax_control.set_ylabel("Control Input (rad/s)", fontsize=12)
+        if algo == "ACS":
+            ax_control.set_title(f"Control Inputs (rad/s)", fontsize=14, fontweight='bold')
+            ax_control.tick_params(labelbottom=False)  # No x-axis labels in the first row
+        else:
+            ax_control.set_xlabel("Time (s)", fontsize=12)
+        ax_control.set_ylabel(f"{algo}", fontsize=14, fontweight='bold')
         ax_control.grid(True)
 
         # --- Plot Laziness History (1 - Action) ---
         # for agent in range(num_agents_max):
         for agent in reversed(range(num_agents_max)):
             ax_laziness.plot(time_axis, laziness_hist[:, agent], color=agent_colors[agent], alpha=1.0, linewidth=1.5)
-        ax_laziness.set_title(f"Laziness Changes - {algo}", fontsize=14)
-        ax_laziness.set_xlabel("Time (s)", fontsize=12)
-        ax_laziness.set_ylabel("Laziness", fontsize=12)
+        if algo == "ACS":
+            ax_laziness.set_title(f"Laziness", fontsize=14, fontweight='bold')
+            ax_laziness.tick_params(labelbottom=False)  # No x-axis labels in the first row
+        else:
+            ax_laziness.set_xlabel("Time (s)", fontsize=12)
+        # ax_laziness.set_ylabel("Laziness", fontsize=12, fontweight='bold')
         ax_laziness.set_ylim(-0.05, 1)
         ax_laziness.grid(True)
 
     # plt.suptitle(f"Episode {ep+1}", fontsize=16)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.tight_layout(rect=[0, 0, 1, 0.96], w_pad=4.4, h_pad=2.2)
 
     # Save the figure as a separate file.
     today_str = datetime.now().strftime("%y%m%d")
