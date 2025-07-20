@@ -2,17 +2,13 @@ import os
 import sys
 import inspect
 
-
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0, parentdir)
-
 import numpy as np
 import pickle
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch  # For custom legend handles
 
 ########################
+# Figure/style settings
 fig_width = 16
 fig_height = 8
 
@@ -28,83 +24,176 @@ legend_fontsize = 14
 legend_bold = True
 #######################
 
-
+# Add parent directory to path if needed
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
 
 # Load data
 with open("../paper_data_3.pkl", "rb") as f:
     data = pickle.load(f)
-    acs_results = data["acs"]  # {agent_num: n_exp x 2[reward, time]}
+    acs_results       = data["acs"]        # {agent_num: n_exp x 2 [reward, time]}
     heuristic_results = data["heuristic"]
-    rl_results = data["rl"]
+    rl_results        = data["rl"]
 
-num_agent_list = [8,16,32,64,128,256,512,1024]
+# List of agent counts to plot
+num_agent_list = [8, 16, 32, 64, 128, 256, 512, 1024]
 
-# Prepare data for plotting
-acs_cost = {num_agents: -acs_results[num_agents][:, 0] for num_agents in num_agent_list}
-heuristic_cost = {num_agents: -heuristic_results[num_agents][:, 0] for num_agents in num_agent_list}
-rl_cost = {num_agents: -rl_results[num_agents][:, 0] for num_agents in num_agent_list}
+# Compute total cost = -reward
+acs_total       = {n: -acs_results[n][:, 0]       for n in num_agent_list}
+heuristic_total = {n: -heuristic_results[n][:, 0] for n in num_agent_list}
+rl_total        = {n: -rl_results[n][:, 0]        for n in num_agent_list}
 
-# Setting up the plot with larger figure size for clarity
-fig, ax = plt.subplots(figsize=(fig_width, fig_height))  # Adjust as needed for your content
+# Compute convergence time (scaled) and control cost separately
+acs_time         = {n: acs_results[n][:, 1] * 0.1      for n in num_agent_list}
+heuristic_time   = {n: heuristic_results[n][:, 1] * 0.1 for n in num_agent_list}
+rl_time          = {n: rl_results[n][:, 1] * 0.1        for n in num_agent_list}
 
-# Use the default Matplotlib color cycle for algorithm colors
-alg_colors = plt.rcParams['axes.prop_cycle'].by_key()['color'][:3]
+acs_control      = {n: acs_total[n] - acs_time[n]       for n in num_agent_list}
+heuristic_control= {n: heuristic_total[n] - heuristic_time[n] for n in num_agent_list}
+rl_control       = {n: rl_total[n] - rl_time[n]         for n in num_agent_list}
 
-# Horizontal line properties with increased line width
-line_props = dict(color="black", linewidth=2.0, linestyle='-')
-hatch_patterns = ['', '//', '\\'] 
+# Common boxplot style settings
+alg_colors     = plt.rcParams['axes.prop_cycle'].by_key()['color'][:3]
+hatch_patterns = ['', '//', '\\']
+line_props     = dict(color="black", linewidth=2.0, linestyle='-')
+mean_props     = dict(linestyle=':', linewidth=2.0, color='black')
 
-# Mean line properties
-mean_props = dict(linestyle=':', linewidth=2.0, color='black')
+# Helper to set axis labels and ticks
+def style_ax(ax, ylabel):
+    # X-ticks
+    ax.set_xticks([i*3 + 0.7 for i in range(len(num_agent_list))])
+    ax.set_xticklabels(num_agent_list, fontsize=14)
 
-# Plotting the data with refined settings
-for i, num_agents in enumerate(num_agent_list):
-    data_to_plot = [acs_cost[num_agents]], heuristic_cost[num_agents], rl_cost[num_agents]
-    # Reduced spacing for closer boxplots
-    positions = [i*3, i*3+0.6, i*3+1.2]  # Adjust spacing here
-    for j, data in enumerate(data_to_plot):
-        # Flier properties with the same color as the box and alpha transparency
-        flier_props = dict(marker='o', markerfacecolor=alg_colors[j], markersize=5, linestyle='none', markeredgecolor='none', alpha=0.5)
-        # Plotting the boxplots with mean line
-        bplot = ax.boxplot(data, positions=[positions[j]], widths=0.5, patch_artist=True, medianprops=line_props, flierprops=flier_props, meanline=True, meanprops=mean_props, showmeans=True, showcaps=True, whis=[5, 95])
+    # Axis labels
+    weight = "bold" if label_bold else "normal"
+    ax.set_xlabel("Number of Agents", fontsize=xlabel_fontsize, fontweight=weight)
+    ax.set_ylabel(ylabel, fontsize=ylabel_fontsize, fontweight=weight)
+
+    # Tick label fonts
+    tw = "bold" if tick_bold else "normal"
+    plt.xticks(fontsize=xtick_fontsize, fontweight=tw)
+    plt.yticks(fontsize=ytick_fontsize, fontweight=tw)
+
+    # Grid
+    ax.grid(True, linestyle='--', linewidth=0.5, color='grey', alpha=0.5)
+
+# 1) Plot Total Cost
+fig_total, ax_total = plt.subplots(figsize=(fig_width, fig_height))
+for i, n in enumerate(num_agent_list):
+    group_data = [acs_total[n], heuristic_total[n], rl_total[n]]
+    positions = [i*3, i*3 + 0.6, i*3 + 1.2]
+    for j, arr in enumerate(group_data):
+        bplot = ax_total.boxplot(
+            arr,
+            positions=[positions[j]],
+            widths=0.5,
+            patch_artist=True,
+            medianprops=line_props,
+            flierprops=dict(marker='o',
+                            markerfacecolor=alg_colors[j],
+                            markersize=5,
+                            linestyle='none',
+                            markeredgecolor='none',
+                            alpha=0.5),
+            meanline=True,
+            meanprops=mean_props,
+            showmeans=True,
+            showcaps=True,
+            whis=[5, 95]
+        )
         for patch in bplot['boxes']:
             patch.set_facecolor(alg_colors[j])
             patch.set_hatch(hatch_patterns[j])
 
-# Customizing the plot for readability and clarity
-ax.set_xticks([i*3+0.7 for i in range(len(num_agent_list))])  # Align x-ticks with the center boxplot of each group
-ax.set_xticklabels(num_agent_list, fontsize=14)  # Increase font size
-
-xlabel_fontweight = "bold" if label_bold else "normal"
-ylabel_fontweight = "bold" if label_bold else "normal"
-
-ax.set_xlabel("Number of Agents", fontsize=xlabel_fontsize, fontweight=xlabel_fontweight)
-ax.set_ylabel("Cost", fontsize=ylabel_fontsize, fontweight=ylabel_fontweight)
-
-
-xticks_fontweight = "bold" if tick_bold else "normal"
-yticks_fontweight = "bold" if tick_bold else "normal"
-
-plt.xticks(fontsize=xtick_fontsize, fontweight=xticks_fontweight)
-plt.yticks(fontsize=ytick_fontsize, fontweight=yticks_fontweight)
-
-# Update legend to include hatch patterns
-legend_handles = [Patch(facecolor=color, hatch=hatch, label=label) for color, hatch, label in zip(alg_colors, hatch_patterns, ["ACS", "Heuristic", "RL"])]
-
-ax.legend(handles=legend_handles, loc="upper left", fontsize=legend_fontsize)
-
+# Legend
+legend_handles = [
+    Patch(facecolor=c, hatch=h, label=l)
+    for c, h, l in zip(alg_colors, hatch_patterns, ["ACS", "Heuristic", "RL"])
+]
+ax_total.legend(handles=legend_handles, loc="upper left", fontsize=legend_fontsize)
 if legend_bold:
-    for label in ax.get_legend().get_texts():
-        label.set_fontweight('bold')
+    for text in ax_total.get_legend().get_texts():
+        text.set_fontweight('bold')
 
-# Adding grid lines for better readability
-ax.grid(True, linestyle='--', linewidth=0.5, color='grey', alpha=0.5)
-
-# Ensure the plot is not cramped
+style_ax(ax_total, ylabel="Total Cost")
 plt.tight_layout()
-
-# Displaying the plot
 plt.show()
+fig_total.savefig('paper_data_3_total_cost.png', dpi=300)
 
-# Save the plot as a .png file
-fig.savefig('paper_data_3.png', format='png', dpi=300)
+# 2) Plot Control Cost
+fig_ctrl, ax_ctrl = plt.subplots(figsize=(fig_width, fig_height))
+for i, n in enumerate(num_agent_list):
+    group_data = [acs_control[n], heuristic_control[n], rl_control[n]]
+    positions = [i*3, i*3 + 0.6, i*3 + 1.2]
+    for j, arr in enumerate(group_data):
+        bplot = ax_ctrl.boxplot(
+            arr,
+            positions=[positions[j]],
+            widths=0.5,
+            patch_artist=True,
+            medianprops=line_props,
+            flierprops=dict(marker='o',
+                            markerfacecolor=alg_colors[j],
+                            markersize=5,
+                            linestyle='none',
+                            markeredgecolor='none',
+                            alpha=0.5),
+            meanline=True,
+            meanprops=mean_props,
+            showmeans=True,
+            showcaps=True,
+            whis=[5, 95]
+        )
+        for patch in bplot['boxes']:
+            patch.set_facecolor(alg_colors[j])
+            patch.set_hatch(hatch_patterns[j])
+
+ax_ctrl.legend(handles=legend_handles, loc="upper left", fontsize=legend_fontsize)
+if legend_bold:
+    for text in ax_ctrl.get_legend().get_texts():
+        text.set_fontweight('bold')
+
+style_ax(ax_ctrl, ylabel="Control Cost")
+plt.tight_layout()
+plt.show()
+fig_ctrl.savefig('paper_data_3_control_cost.png', dpi=300)
+
+# 3) Plot Convergence Time
+fig_time, ax_time = plt.subplots(figsize=(fig_width, fig_height))
+for i, n in enumerate(num_agent_list):
+    group_data = [acs_time[n], heuristic_time[n], rl_time[n]]
+    positions = [i*3, i*3 + 0.6, i*3 + 1.2]
+    for j, arr in enumerate(group_data):
+        bplot = ax_time.boxplot(
+            arr,
+            positions=[positions[j]],
+            widths=0.5,
+            patch_artist=True,
+            medianprops=line_props,
+            flierprops=dict(marker='o',
+                            markerfacecolor=alg_colors[j],
+                            markersize=5,
+                            linestyle='none',
+                            markeredgecolor='none',
+                            alpha=0.5),
+            meanline=True,
+            meanprops=mean_props,
+            showmeans=True,
+            showcaps=True,
+            whis=[5, 95]
+        )
+        for patch in bplot['boxes']:
+            patch.set_facecolor(alg_colors[j])
+            patch.set_hatch(hatch_patterns[j])
+
+# Move legend to lower right
+ax_time.legend(handles=legend_handles, loc="lower right", fontsize=legend_fontsize)
+if legend_bold:
+    for text in ax_time.get_legend().get_texts():
+        text.set_fontweight('bold')
+
+style_ax(ax_time, ylabel="Convergence Time")
+plt.tight_layout()
+plt.show()
+fig_time.savefig('paper_data_3_convergence_time.png', dpi=300)
