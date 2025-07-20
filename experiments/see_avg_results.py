@@ -23,6 +23,8 @@ def process_results(file_path, algos):
         # Filter out invalid time steps (only within the episode length)
         control_sums = []
         for arr, length in zip(u_hists, l):
+            # if length > 1000:
+            #     length = 1000
             sum_per_episode = np.abs(arr[:length]).mean(axis=1).sum()
             control_sums.append(sum_per_episode)
 
@@ -50,7 +52,7 @@ def main():
     file_paths = [
         "./data/cl_n8_241117_180006.pkl",
         "./data/cl_n16_241117_181635.pkl",
-        "./data/cl_n20_241118_162131.pkl",
+        # "./data/cl_n20_241118_162131.pkl",
         "./data/cl_n32_241117_183334.pkl",
         "./data/cl_n64_241117_185209.pkl",
         "./data/cl_n128_241117_200041.pkl",

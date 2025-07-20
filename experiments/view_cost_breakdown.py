@@ -43,7 +43,7 @@ def plot_individual_cost(agents, cost_data, cost_type='control'):
     plt.yticks(fontsize=14)
     plt.xlabel('Number of Agents', fontsize=16, fontweight='bold')
     y_unit = ' (s)' if cost_type == 'Convergence Time' else ''
-    plt.ylabel(f'{cost_type.capitalize()}{y_unit}', fontsize=16, fontweight='bold')
+    plt.ylabel(f'{cost_type}{y_unit}', fontsize=16, fontweight='bold')
     # plt.title(f'{cost_type.capitalize()} by Algorithm and Number of Agents', fontsize=14, fontweight='bold')
     plt.legend(fontsize=16)
     plt.tight_layout()
