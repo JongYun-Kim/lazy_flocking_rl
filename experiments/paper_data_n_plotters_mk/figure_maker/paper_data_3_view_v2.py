@@ -30,7 +30,7 @@ parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
 # Load data
-with open("../paper_data_3.pkl", "rb") as f:
+with open("../paper_data_3_v2_max-time-2k.pkl", "rb") as f:
     data = pickle.load(f)
     acs_results       = data["acs"]        # {agent_num: n_exp x 2 [reward, time]}
     heuristic_results = data["heuristic"]
@@ -193,7 +193,7 @@ if legend_bold:
     for text in ax_time.get_legend().get_texts():
         text.set_fontweight('bold')
 
-style_ax(ax_time, ylabel="Convergence Time")
+style_ax(ax_time, ylabel="Convergence Time (s)")
 plt.tight_layout()
 plt.show()
 fig_time.savefig('paper_data_3_convergence_time.png', dpi=300)
