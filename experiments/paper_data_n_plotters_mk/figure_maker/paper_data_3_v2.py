@@ -67,14 +67,14 @@ checkpoint_path = trial_path + "/checkpoint_000074/policies/default_policy"
 policy = Policy.from_checkpoint(checkpoint_path)
 policy.model.eval()
 
-# with open("../paper_data_3_v2_max-time-2k.pkl", "rb") as f:
-#     data = pickle.load(f)
-#     acs_results = data["acs"]  # {agent_num: n_exp x 2[reward, time]}
-#     heuristic_results = data["heuristic"]
-#     rl_results = data["rl"]
-acs_results = dict()
-heuristic_results = dict()
-rl_results = dict()
+with open("../paper_data_3_v2_max-time-2k.pkl", "rb") as f:
+    data = pickle.load(f)
+    acs_results = data["acs"]  # {agent_num: n_exp x 2[reward, time]}
+    heuristic_results = data["heuristic"]
+    rl_results = data["rl"]
+# acs_results = dict()
+# heuristic_results = dict()
+# rl_results = dict()
 
 @ray.remote(num_cpus=1)
 def test(seed, envs, n_agent):
@@ -128,7 +128,7 @@ def test(seed, envs, n_agent):
     return data
 
 
-ray.init(num_cpus=14,num_gpus=1)
+ray.init(num_cpus=13,num_gpus=1)
 
 #### Experiment ! ####
 num_agent_list = [8, 16, 32, 64, 128, 256, 512, 1024]
@@ -169,7 +169,12 @@ for n_agent in num_agent_list:
     #     acs_results[n_agent][idx] = result["acs"]
     #     heuristic_results[n_agent][idx] = result["heuristic"]
 
-    for idx, result in enumerate(tqdm(results, desc=f"Collecting ACS/Heuristic ({n_agent} agents)")):
+    # for idx, result in enumerate(tqdm(results, desc=f"Collecting ACS/Heuristic ({n_agent} agents)")):
+    #     acs_results[n_agent][idx] = result["acs"]
+    #     heuristic_results[n_agent][idx] = result["heuristic"]
+
+    for idx, fut in enumerate(tqdm(works, desc=f"Collecting ACS/Heuristic ({n_agent} agents)")):
+        result = ray.get(fut)
         acs_results[n_agent][idx] = result["acs"]
         heuristic_results[n_agent][idx] = result["heuristic"]
 
@@ -178,7 +183,7 @@ for n_agent in num_agent_list:
     # for exp in tqdm(seed):
         env_rl.seed(exp)
         obs = env_rl.reset()
-        
+
         done = False
         reward_rl = 0
         t_rl = 0
@@ -188,7 +193,7 @@ for n_agent in num_agent_list:
             obs, reward, done, _ = env_rl.step(action[0])
 
             reward_rl += reward
-            t_rl += 1      
+            t_rl += 1
         rl_results[n_agent][exp] = [reward_rl, t_rl]
 
     print(f"ACS: mean reward: {acs_results[n_agent][:, 0].mean()}, mean time: {acs_results[n_agent][:, 1].mean()}")
@@ -197,6 +202,6 @@ for n_agent in num_agent_list:
 
     print("Saving the results...")
     # save the results in one file with pickle
-    results = {"acs": acs_results, "heuristic": heuristic_results, "rl": rl_results}
-    with open("paper_data_3_v2_max-time-2k.pkl", "wb") as f:
+    results = {"acs": acs_results, "heuristic": heuristic_results, "rl": rl_results, "env_config": env_config}
+    with open("paper_data_3_v2_max-time-3k.pkl", "wb") as f:
         pickle.dump(results, f)

@@ -10,17 +10,17 @@ from matplotlib.patches import Patch  # For custom legend handles
 ########################
 # Figure/style settings
 fig_width = 16
-fig_height = 8
+fig_height = 9.6
 
-xlabel_fontsize = 16
-ylabel_fontsize = 16
+xlabel_fontsize = 20
+ylabel_fontsize = 20
 label_bold = True
 
-xtick_fontsize = 12
-ytick_fontsize = 12
+xtick_fontsize = 16
+ytick_fontsize = 16
 tick_bold = True
 
-legend_fontsize = 14
+legend_fontsize = 20
 legend_bold = True
 #######################
 
@@ -116,7 +116,10 @@ if legend_bold:
     for text in ax_total.get_legend().get_texts():
         text.set_fontweight('bold')
 
-style_ax(ax_total, ylabel="Total Cost")
+style_ax(ax_total, ylabel="Cost")
+##  REMOVE THIS LINE IF YOU WANT TO SHOW ALL DATA
+ax_total.set_ylim(top=900)
+##
 plt.tight_layout()
 plt.show()
 fig_total.savefig('paper_data_3_total_cost.png', dpi=300)
@@ -155,6 +158,9 @@ if legend_bold:
         text.set_fontweight('bold')
 
 style_ax(ax_ctrl, ylabel="Control Cost")
+## Remove outliers from y-axis
+ax_ctrl.set_ylim(top=700)
+##
 plt.tight_layout()
 plt.show()
 fig_ctrl.savefig('paper_data_3_control_cost.png', dpi=300)
@@ -188,7 +194,7 @@ for i, n in enumerate(num_agent_list):
             patch.set_hatch(hatch_patterns[j])
 
 # Move legend to lower right
-ax_time.legend(handles=legend_handles, loc="lower right", fontsize=legend_fontsize)
+ax_time.legend(handles=legend_handles, loc="upper left", fontsize=legend_fontsize)
 if legend_bold:
     for text in ax_time.get_legend().get_texts():
         text.set_fontweight('bold')
