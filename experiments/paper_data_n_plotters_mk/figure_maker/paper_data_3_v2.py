@@ -2,6 +2,7 @@ import os
 import sys
 import inspect
 
+# from experiments.paper_data_n_plotters_mk.figure_maker.paper_data_3 import acs_results
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -21,11 +22,8 @@ from ray.rllib.models import ModelCatalog
 import ray
 
 from tqdm import tqdm
-
 import time
-
 import copy
-
 import pickle
 
 
@@ -40,7 +38,7 @@ env_config = {
     "std_vel_converged": 0.1,  # Standard velocity when converged. Default is 0.1
     "std_pos_rate_converged": 0.1,  # Standard position rate when converged. Default is 0.1
     "std_vel_rate_converged": 0.2,  # Standard velocity rate when converged. Default is 0.2
-    "max_time_step": 1000,  # Maximum time steps. Default is 2000,
+    "max_time_step": 2000,  # Maximum time steps. Default is 2000,
     "incomplete_episode_penalty": -0,  # Penalty for incomplete episode. Default is -600
     "normalize_obs": True,  # If True, the env will normalize the obs. Default: False\
     "use_fixed_horizon": False,  # If True, the env will use fixed horizon. Default: False
@@ -62,18 +60,21 @@ env_config = {
 model_name = "custom_model"
 ModelCatalog.register_custom_model(model_name, MyRLlibTorchWrapper)
 
-base_path = "/server/Downloads/lazy_flocking_rl/bk/bk_082623"
+base_path = "../../../bk/bk_082623"
 trial_path = base_path + "/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47"  # the first emergent behavior (chkp74)
 checkpoint_path = trial_path + "/checkpoint_000074/policies/default_policy"
 
 policy = Policy.from_checkpoint(checkpoint_path)
 policy.model.eval()
 
-with open("paper_data_3.pkl", "rb") as f:
-    data = pickle.load(f)
-    acs_results = data["acs"]  # {agent_num: n_exp x 2[reward, time]}
-    heuristic_results = data["heuristic"]
-    rl_results = data["rl"]
+# with open("../paper_data_3_v2_max-time-2k.pkl", "rb") as f:
+#     data = pickle.load(f)
+#     acs_results = data["acs"]  # {agent_num: n_exp x 2[reward, time]}
+#     heuristic_results = data["heuristic"]
+#     rl_results = data["rl"]
+acs_results = dict()
+heuristic_results = dict()
+rl_results = dict()
 
 @ray.remote(num_cpus=1)
 def test(seed, envs, n_agent):
@@ -126,10 +127,11 @@ def test(seed, envs, n_agent):
 
     return data
 
-ray.init(num_cpus=10,num_gpus=1)
 
-################## Experiment Code ##################
-num_agent_list = [1024]
+ray.init(num_cpus=14,num_gpus=1)
+
+#### Experiment ! ####
+num_agent_list = [8, 16, 32, 64, 128, 256, 512, 1024]
 num_exp = 100
 seed = 0
 
@@ -163,12 +165,17 @@ for n_agent in num_agent_list:
     works = [test.remote(s, [env_acs, env_heurstic, env_rl], n_agent) for s in seed]
     results = ray.get(works)
 
-    for idx, result in enumerate(results):
+    # for idx, result in enumerate(results):
+    #     acs_results[n_agent][idx] = result["acs"]
+    #     heuristic_results[n_agent][idx] = result["heuristic"]
+
+    for idx, result in enumerate(tqdm(results, desc=f"Collecting ACS/Heuristic ({n_agent} agents)")):
         acs_results[n_agent][idx] = result["acs"]
         heuristic_results[n_agent][idx] = result["heuristic"]
 
     print("RL...")
-    for exp in tqdm(seed):
+    for exp in tqdm(seed, desc=f"RL ({n_agent} agents)"):
+    # for exp in tqdm(seed):
         env_rl.seed(exp)
         obs = env_rl.reset()
         
@@ -188,8 +195,8 @@ for n_agent in num_agent_list:
     print(f"Heuristic: mean reward: {heuristic_results[n_agent][:, 0].mean()}, mean time: {heuristic_results[n_agent][:, 1].mean()}")
     print(f"RL: mean reward: {rl_results[n_agent][:, 0].mean()}, mean time: {rl_results[n_agent][:, 1].mean()}")
 
-    # print("Saving the results...")
-    # # save the results in one file with pickle
-    # results = {"acs": acs_results, "heuristic": heuristic_results, "rl": rl_results}
-    # with open("paper_data_3.pkl", "wb") as f:
-    #     pickle.dump(results, f)
+    print("Saving the results...")
+    # save the results in one file with pickle
+    results = {"acs": acs_results, "heuristic": heuristic_results, "rl": rl_results}
+    with open("paper_data_3_v2_max-time-2k.pkl", "wb") as f:
+        pickle.dump(results, f)
