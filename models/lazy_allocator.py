@@ -708,6 +708,9 @@ class MyMLPModel(TorchModelV2, nn.Module):
             self.deterministic_action = False
             print("deterministic_action not received!!")
             print("deterministic_action == False")
+        # Fixed log_std: when set, log_std outputs are fixed to this value (e.g., -10)
+        # This mimics the Transformer's "deterministic" mode which uses Gaussian with very low std
+        self.fixed_log_std = cfg.get("fixed_log_std", None)
 
         # Define observation size
         self.obs_size = get_preprocessor(obs_space)(obs_space).size  # (6 * num_task_max)
@@ -801,11 +804,13 @@ class MyMLPModel(TorchModelV2, nn.Module):
             upper_bound = 1.05
             action_means = torch.tanh(action_means) * (upper_bound/2) + (upper_bound/2)
 
-            # action_stds = (-10) * torch.ones_like(action_means, dtype=action_means.dtype, requires_grad=False)
-            log_std_min = -10
-            log_std_max = -1.5
-            action_stds = self.action_branch_logstd(self._features)
-            action_stds = torch.tanh(action_stds) * (log_std_max - log_std_min) / 2 + (log_std_max + log_std_min) / 2
+            if self.fixed_log_std is not None:
+                action_stds = self.fixed_log_std * torch.ones_like(action_means)
+            else:
+                log_std_min = -10
+                log_std_max = -1.5
+                action_stds = self.action_branch_logstd(self._features)
+                action_stds = torch.tanh(action_stds) * (log_std_max - log_std_min) / 2 + (log_std_max + log_std_min) / 2
             self._logits = torch.cat([action_means, action_stds], dim=1)
 
 
