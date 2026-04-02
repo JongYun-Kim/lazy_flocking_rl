@@ -154,29 +154,30 @@ if __name__ == "__main__":
         keep_checkpoints_num=32,
         checkpoint_at_end=True,
         checkpoint_score_attr="evaluation/episode_reward_mean",
-        # Resources per trial: 0.5 GPU + ~7 CPUs → 6 trials fit on 4 GPU / 72 CPU
-        resources_per_trial={"cpu": 1, "gpu": 0.5},
         config={
             "env": "lazy_env_train",
-            "env_config": ENV_CONFIG,
+            "env_config": {
+                **ENV_CONFIG,
+                # variant index lives inside env_config to avoid PPO config validation error
+                "_variant": tune.grid_search(list(range(len(VARIANTS)))),
+            },
             "framework": "torch",
             "callbacks": MyCallbacks,
-            # --- Variant selection (parallel grid) ---
-            "__variant_idx": tune.grid_search(list(range(len(VARIANTS)))),
+            # --- Variant-dependent params resolved via sample_from ---
             "model": {
                 "custom_model": "custom_model_mlp",
                 "custom_model_config": tune.sample_from(
-                    lambda spec: VARIANTS[spec.config["__variant_idx"]]["model_config"]
+                    lambda spec: VARIANTS[spec.config["env_config"]["_variant"]]["model_config"]
                 ),
             },
             "lr": tune.sample_from(
-                lambda spec: VARIANTS[spec.config["__variant_idx"]]["lr"]
+                lambda spec: VARIANTS[spec.config["env_config"]["_variant"]]["lr"]
             ),
             "lr_schedule": tune.sample_from(
-                lambda spec: VARIANTS[spec.config["__variant_idx"]]["lr_schedule"]
+                lambda spec: VARIANTS[spec.config["env_config"]["_variant"]]["lr_schedule"]
             ),
             "entropy_coeff_schedule": tune.sample_from(
-                lambda spec: VARIANTS[spec.config["__variant_idx"]]["entropy_coeff_schedule"]
+                lambda spec: VARIANTS[spec.config["env_config"]["_variant"]]["entropy_coeff_schedule"]
             ),
             # --- Fixed PPO config (from checkpoint 74) ---
             "num_gpus": 0.5,
