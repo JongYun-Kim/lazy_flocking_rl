@@ -5,7 +5,10 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-matplotlib.use('TkAgg')  # To avoid the MacOS backend; but just follow your needs
+try:
+    matplotlib.use('TkAgg')  # To avoid the MacOS backend; but just follow your needs
+except (ImportError, ModuleNotFoundError):
+    matplotlib.use('Agg')
 
 # Compatibility layer for np.bool_ and np.bool
 if not hasattr(np, 'bool_'):

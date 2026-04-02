@@ -763,8 +763,8 @@ class MyMLPModel(TorchModelV2, nn.Module):
             self.action_branch = nn.Linear(self.last_size, num_outputs)
         else:
             assert num_outputs % 2 == 0, "num_outputs must be even!"
-            assert num_outputs==action_space.shape[0], "num_outputs must be equal to action_space.shape[0]"
-            mean_size = int(num_outputs/2)  # we use constant variance for now
+            assert num_outputs == 2 * action_space.shape[0], "num_outputs must be 2 * action_space.shape[0] for Gaussian dist"
+            mean_size = int(num_outputs/2)
             self.action_branch_mean = nn.Linear(self.last_size, mean_size)
             self.action_branch_logstd = nn.Linear(self.last_size, mean_size)
         # Value network's last layer
