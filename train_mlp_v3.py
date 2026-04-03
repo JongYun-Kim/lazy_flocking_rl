@@ -89,8 +89,8 @@ VARIANTS = [
 
 
 if __name__ == "__main__":
-    # Cap CPU at 48 → 6 trials run simultaneously (7 workers + 1 eval = 8 CPUs/trial)
-    ray.init(num_cpus=48)
+    # 1 driver + 7 workers + 3 eval workers = 11 CPUs/trial → 6 trials × 11 = 66 CPUs
+    ray.init(num_cpus=66)
 
     register_env("lazy_env_train", lambda cfg: LazyAgentsCentralizedPendReward(cfg))
     register_env("lazy_env_eval", lambda cfg: LazyAgentsCentralized(cfg))
@@ -144,7 +144,7 @@ if __name__ == "__main__":
             "evaluation_interval": 1,
             "evaluation_duration": 100,
             "evaluation_duration_unit": "episodes",
-            "evaluation_num_workers": 1,
+            "evaluation_num_workers": 3,
             "evaluation_config": {
                 "env": "lazy_env_eval",
                 "env_config": EVAL_ENV_CONFIG,
