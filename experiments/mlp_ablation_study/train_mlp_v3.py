@@ -5,6 +5,10 @@
 #   - #5 wide and #9 shared_wide_deep also param-matched to Transformer
 #   - Worker config matches Transformer training exactly
 #   - Ray CPU capped at 48 → 6 trials run simultaneously
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 import ray
 from ray import tune
 from ray.rllib.models import ModelCatalog

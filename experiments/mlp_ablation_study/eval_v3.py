@@ -1,5 +1,9 @@
 # Final evaluation for v3: 12 MLP variants + Transformer + ACS
 # Eval: LazyAgentsCentralized, use_fixed_horizon=False, use_L2_norm=False, 100 episodes
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 import numpy as np
 import copy
 import glob
@@ -27,6 +31,7 @@ env_config_base = {
     "use_preprocessed_obs": True, "get_state_hist": False,
 }
 
+PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 V3_DIR = "/home/flocking/ray_results/mlp_ablation_v3"
 v3_dirs = sorted(glob.glob(f"{V3_DIR}/PPO_lazy_env_train_3bfe6_*"))
 
@@ -40,7 +45,7 @@ SHARED = [False, False, False, False, False, False, False, True, True, True, Tru
 MODELS = {}
 # Transformer
 MODELS["Transformer"] = {
-    "ckpt": "bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
+    "ckpt": os.path.join(PROJECT_ROOT, "bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy"),
     "mlp": False, "shared": True,
 }
 # MLP variants
