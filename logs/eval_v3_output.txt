@@ -1,0 +1,75 @@
+/usr/local/lib/python3.9/dist-packages/ray/air/_internal/remote_storage.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+Loading Transformer...
+Loading MLP_baseline...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_deterministic...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_higher_lr...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_lr_schedule...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_entropy...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_wide_matched...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_wide_deep...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_sh_base...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_sh_wide...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_sh_wd_matched...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_sh_determ_match...
+deterministic_action not received!!
+deterministic_action == False
+Loading MLP_determ_match...
+deterministic_action not received!!
+deterministic_action == False
+
+Running 100 episodes for 14 models...
+/usr/local/lib/python3.9/dist-packages/gym/core.py:172: DeprecationWarning: [33mWARN: Function `env.seed(seed)` is marked as deprecated and will be removed in the future. Please use `env.reset(seed=seed) instead.[0m
+  deprecation(
+/workspace/env/envs.py:869: DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`. To silence this warning, use `bool` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.bool_` here.
+Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+  assert mask.dtype == np.bool  # np.bool_ depending on your ray (or numpy) version
+  20/100 done  (ETA: 1509s)
+  40/100 done  (ETA: 1127s)
+  60/100 done  (ETA: 752s)
+  80/100 done  (ETA: 376s)
+  100/100 done  (ETA: 0s)
+
+Done in 0:31:20.147318
+
+==============================================================================================================
+FINAL EVALUATION — MLP Ablation v3
+Environment: LazyAgentsCentralized | use_fixed_horizon=False | use_L2_norm=False | Episodes: 100
+==============================================================================================================
+Model                  Shared     Params  Ckpt   Reward      Gap    ±std  Conv%  ConvLen    EpLen
+--------------------------------------------------------------------------------------------------------------
+Transformer               Yes    874,497    74   -157.8        —    46.0    98%      547    556.5
+MLP_baseline               No    292,393    37   -466.6   -308.8     9.2     0%        —   1000.0
+MLP_deterministic          No    292,393   300   -427.4   -269.6    48.5     0%        —   1000.0
+MLP_higher_lr              No    292,393    52   -221.7    -63.9    13.2     0%        —   1000.0
+MLP_lr_schedule            No    292,393    90   -422.5   -264.8    59.4     0%        —   1000.0
+MLP_entropy                No    292,393   232   -362.4   -204.6    35.5     0%        —   1000.0
+MLP_wide_matched           No    872,347   268   -349.3   -191.5    25.0     0%        —   1000.0
+MLP_wide_deep              No  1,568,809   276   -427.2   -269.5    47.6     0%        —   1000.0
+MLP_sh_base               Yes    167,977   281   -406.1   -248.3    46.7     0%        —   1000.0
+MLP_sh_wide               Yes    598,057   234   -337.0   -179.2    34.5     0%        —   1000.0
+MLP_sh_wd_matched         Yes    873,629   259   -402.4   -244.7    57.8     0%        —   1000.0
+MLP_sh_determ_match       Yes    873,629    54   -413.6   -255.9    40.7     0%        —   1000.0
+MLP_determ_match           No    872,347   130   -384.5   -226.8    42.7     0%        —   1000.0
+ACS                         —          —     —   -227.8    -70.0   105.4    96%      617    632.3
+==============================================================================================================

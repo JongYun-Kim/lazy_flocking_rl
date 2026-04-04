@@ -1,5 +1,5 @@
-# Final evaluation: All MLP ablations (v2 + shared) vs Transformer vs ACS
-# Proper eval: LazyAgentsCentralized, use_fixed_horizon=False, 100 seeded episodes
+# Final evaluation for v3: 12 MLP variants + Transformer + ACS
+# Eval: LazyAgentsCentralized, use_fixed_horizon=False, use_L2_norm=False, 100 episodes
 import numpy as np
 import copy
 import glob
@@ -22,64 +22,33 @@ env_config_base = {
     "std_pos_rate_converged": 0.1, "std_vel_rate_converged": 0.2,
     "max_time_step": max_time_step, "incomplete_episode_penalty": 0,
     "normalize_obs": True, "use_fixed_horizon": False,
-    "use_L2_norm": False, "use_heuristics": True,
-    "_use_fixed_lazy_idx": True, "use_preprocessed_obs": True,
-    "get_state_hist": False,
+    "use_L2_norm": False,
+    "use_heuristics": True, "_use_fixed_lazy_idx": True,
+    "use_preprocessed_obs": True, "get_state_hist": False,
 }
 
-V2_DIR = "/home/flocking/ray_results/mlp_ablation_v2_fixed_eval"
-SH_DIR = "/home/flocking/ray_results/mlp_ablation_v2_shared"
-v2_dirs = sorted(glob.glob(f"{V2_DIR}/PPO_*"))
-sh_dirs = sorted(glob.glob(f"{SH_DIR}/PPO_*"))
+V3_DIR = "/home/flocking/ray_results/mlp_ablation_v3"
+v3_dirs = sorted(glob.glob(f"{V3_DIR}/PPO_lazy_env_train_3bfe6_*"))
 
-MODELS = {
-    "Transformer": {
-        "ckpt": "bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
-        "mlp": False, "share": True, "params_label": "875K",
-    },
-    # v2: share_layers=False
-    "MLP_base": {
-        "ckpt": os.path.join(v2_dirs[0], "checkpoint_000188/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "292K",
-    },
-    "MLP_determ": {
-        "ckpt": os.path.join(v2_dirs[1], "checkpoint_000204/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "292K",
-    },
-    "MLP_hi_lr": {
-        "ckpt": os.path.join(v2_dirs[2], "checkpoint_000197/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "292K",
-    },
-    "MLP_lr_sched": {
-        "ckpt": os.path.join(v2_dirs[3], "checkpoint_000234/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "292K",
-    },
-    "MLP_entropy": {
-        "ckpt": os.path.join(v2_dirs[4], "checkpoint_000257/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "292K",
-    },
-    "MLP_wide": {
-        "ckpt": os.path.join(v2_dirs[5], "checkpoint_000291/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "1044K",
-    },
-    "MLP_wide_deep": {
-        "ckpt": os.path.join(v2_dirs[6], "checkpoint_000208/policies/default_policy"),
-        "mlp": True, "share": False, "params_label": "1569K",
-    },
-    # shared: share_layers=True
-    "MLP_sh_base": {
-        "ckpt": os.path.join(sh_dirs[0], "checkpoint_000300/policies/default_policy"),
-        "mlp": True, "share": True, "params_label": "168K",
-    },
-    "MLP_sh_wide": {
-        "ckpt": os.path.join(sh_dirs[1], "checkpoint_000263/policies/default_policy"),
-        "mlp": True, "share": True, "params_label": "598K",
-    },
-    "MLP_sh_wd": {
-        "ckpt": os.path.join(sh_dirs[2], "checkpoint_000200/policies/default_policy"),
-        "mlp": True, "share": True, "params_label": "836K",
-    },
+# Checkpoint selections (>20 rule applied)
+CKPT_ITERS = [37, 300, 52, 90, 232, 268, 276, 281, 234, 259, 54, 130]
+NAMES = ['baseline','deterministic','higher_lr','lr_schedule','entropy',
+         'wide_matched','wide_deep','sh_base','sh_wide','sh_wd_matched',
+         'sh_determ_match','determ_match']
+SHARED = [False, False, False, False, False, False, False, True, True, True, True, False]
+
+MODELS = {}
+# Transformer
+MODELS["Transformer"] = {
+    "ckpt": "bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
+    "mlp": False, "shared": True,
 }
+# MLP variants
+for i, (name, d, ckpt, shared) in enumerate(zip(NAMES, v3_dirs, CKPT_ITERS, SHARED)):
+    MODELS[f"MLP_{name}"] = {
+        "ckpt": os.path.join(d, f"checkpoint_{ckpt:06d}/policies/default_policy"),
+        "mlp": True, "shared": shared,
+    }
 
 
 def run_episode(policy, env, max_steps):
@@ -116,7 +85,6 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("custom_model_mlp", MyMLPModel)
     register_env("lazy_env", lambda cfg: LazyAgentsCentralized(cfg))
 
-    # Load policies and count params
     policies = {}
     param_counts = {}
     for name, info in MODELS.items():
@@ -162,16 +130,16 @@ if __name__ == "__main__":
     print(f"\nDone in {datetime.now() - start}")
 
     # --- Report ---
-    print("\n" + "=" * 100)
-    print("FINAL EVALUATION — MLP Ablation Study (v2 + shared)")
-    print(f"Environment: LazyAgentsCentralized | use_fixed_horizon=False | Episodes: {num_episodes}")
-    print("=" * 100)
+    print("\n" + "=" * 110)
+    print("FINAL EVALUATION — MLP Ablation v3")
+    print(f"Environment: LazyAgentsCentralized | use_fixed_horizon=False | use_L2_norm=False | Episodes: {num_episodes}")
+    print("=" * 110)
 
     tf_r = np.array(results["Transformer"]["rewards"])
 
-    header = f"{'Model':<18s} {'Shared':>6s} {'Params':>8s} {'Reward':>8s} {'Gap':>8s} {'±std':>7s} {'Conv%':>6s} {'ConvLen':>8s} {'EpLen':>8s}"
+    header = f"{'Model':<22s} {'Shared':>6s} {'Params':>10s} {'Ckpt':>5s} {'Reward':>8s} {'Gap':>8s} {'±std':>7s} {'Conv%':>6s} {'ConvLen':>8s} {'EpLen':>8s}"
     print(header)
-    print("-" * 100)
+    print("-" * 110)
 
     for name in all_names:
         rews = np.array(results[name]["rewards"])
@@ -181,13 +149,15 @@ if __name__ == "__main__":
         gap = f"{rews.mean() - tf_r.mean():+.1f}" if name != "Transformer" else "—"
 
         if name in MODELS:
-            shared = "Yes" if MODELS[name]["share"] else "No"
+            shared = "Yes" if MODELS[name]["shared"] else "No"
             params = f"{param_counts[name]:,}"
+            # Extract ckpt iter from path
+            ckpt_str = MODELS[name]["ckpt"].split("checkpoint_")[1].split("/")[0]
+            ckpt_num = ckpt_str.lstrip("0") or "0"
         else:
-            shared = "—"
-            params = "—"
+            shared, params, ckpt_num = "—", "—", "—"
 
-        print(f"{name:<18s} {shared:>6s} {params:>8s} {rews.mean():>8.1f} {gap:>8s} {rews.std():>7.1f} "
-              f"{100*conv.mean():>5.0f}% {conv_len:>8s} {lens.mean():>8.1f}")
+        print(f"{name:<22s} {shared:>6s} {params:>10s} {ckpt_num:>5s} {rews.mean():>8.1f} {gap:>8s} "
+              f"{rews.std():>7.1f} {100*conv.mean():>5.0f}% {conv_len:>8s} {lens.mean():>8.1f}")
 
-    print("=" * 100)
+    print("=" * 110)
