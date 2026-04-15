@@ -1,30 +1,37 @@
 """
 Evaluate the centralized checkpoint with *decentralized* (per-agent) inference.
 
-The previous eval script (``eval_checkpoint_networked.py``) gave the policy a
-**centralized** observation — every agent saw the full swarm state — even on
-sparse topologies.  That tests whether the policy tolerates different ACS
-dynamics, but the policy still has global information.
+Each agent observes **only its topology neighbors** (via
+``build_per_agent_central_obs``). Per-agent observations are batched into a
+single forward pass, and each agent's own action is extracted from its row in
+the batch output.
 
-This script tests the checkpoint properly: each agent observes **only its
-topology neighbors** (via ``build_per_agent_central_obs``).  The per-agent
-observations are batched into a single forward pass, and each agent's own
-action is extracted from its row in the batch output.
-
-Three modes are evaluated per topology on the same seed:
+Two modes are evaluated per topology on the same seed:
 
 * **decentralized** — per-agent local observation, batched forward pass.
-* **centralized**   — original global observation, single forward pass
-  (included for direct comparison of information loss).
 * **acs**           — fully-active ACS baseline (no learned policy).
 
-The FC topology serves as a sanity check: decentralized and centralized modes
-must produce identical trajectories because all agents see all other agents.
+(Centralized-global-obs inference was dropped: the question of interest is how
+much the decentralized policy improves over ACS on each topology.)
+
+Convergence
+-----------
+Each episode is labelled *converged* if there exists a trailing window of
+``--conv_window`` steps (default 100) in which:
+
+  * connectivity held (``is_network_connected`` is True every step),
+  * ``std_pos`` varied by less than ``--conv_pos_rate`` (default 2.0 m),
+  * polar order parameter ``op`` varied by less than ``--conv_op_rate``
+    (default 0.05).
+
+The JSON aggregates are reported both overall and separately for converged
+and non-converged episodes so downstream analysis can tell the two regimes
+apart.
 
 Usage
 -----
     python -m experiments.decentralized.eval_checkpoint_decentralized \
-        --num_episodes 30 \
+        --num_episodes 100 \
         --output experiments/decentralized/results/checkpoint_eval_decentralized.json
 """
 
@@ -131,6 +138,44 @@ def decentralized_action(env: NetworkedLazyAgents, policy) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------- #
+# Convergence criterion
+# ---------------------------------------------------------------------- #
+
+def compute_convergence_step(
+    std_pos: np.ndarray,
+    op: np.ndarray,
+    conn: np.ndarray,
+    *,
+    window: int,
+    pos_rate: float,
+    op_rate: float,
+) -> Optional[int]:
+    """Earliest step ``t`` at which ``[t-window+1, t]`` satisfies:
+
+      * ``conn`` was True every step in the window;
+      * ``max(std_pos) - min(std_pos) < pos_rate`` in the window;
+      * ``max(op) - min(op) < op_rate`` in the window.
+
+    Returns ``None`` if no such ``t`` exists in ``[0, T-1]``.
+    """
+    T = len(std_pos)
+    if T < window:
+        return None
+    for t in range(window - 1, T):
+        lo, hi = t - window + 1, t + 1
+        if not conn[lo:hi].all():
+            continue
+        sp = std_pos[lo:hi]
+        if (sp.max() - sp.min()) >= pos_rate:
+            continue
+        op_w = op[lo:hi]
+        if (op_w.max() - op_w.min()) >= op_rate:
+            continue
+        return int(t)
+    return None
+
+
+# ---------------------------------------------------------------------- #
 # Episode runner
 # ---------------------------------------------------------------------- #
 
@@ -141,23 +186,25 @@ def run_episode(
     mode: str,
     policy=None,
     alignment_threshold: float = 0.95,
+    conv_window: int = 100,
+    conv_pos_rate: float = 2.0,
+    conv_op_rate: float = 0.05,
 ) -> dict:
     """Run one episode.
 
     Parameters
     ----------
-    mode : {"acs", "centralized", "decentralized"}
+    mode : {"acs", "decentralized"}
     """
 
     obs = env.reset()
     reward_sum = 0.0
     length = max_steps
+    op_hist = np.zeros(max_steps, dtype=np.float32)
+    conn_hist = np.zeros(max_steps, dtype=bool)
     for t in range(max_steps):
         if mode == "acs":
             action = env.get_fully_active_action()
-        elif mode == "centralized":
-            action, _, _ = policy.compute_single_action(obs, explore=False)
-            action = np.clip(action, 0.0, 1.0)
         elif mode == "decentralized":
             action = decentralized_action(env, policy)
         else:
@@ -165,21 +212,36 @@ def run_episode(
 
         obs, reward, done, info = env.step(action)
         reward_sum += reward
+        op_hist[t] = env.alignment_order_parameter()
+        conn_hist[t] = env.is_network_connected()
         if done:
             length = t + 1
             break
 
+    std_pos = np.asarray(env.std_pos_hist[:length], dtype=np.float32)
+    std_vel = np.asarray(env.std_vel_hist[:length], dtype=np.float32)
+    op_hist = op_hist[:length]
+    conn_hist = conn_hist[:length]
+
+    conv_step = compute_convergence_step(
+        std_pos, op_hist, conn_hist,
+        window=conv_window, pos_rate=conv_pos_rate, op_rate=conv_op_rate,
+    )
+
     return {
         "reward_sum": float(reward_sum),
         "length": int(length),
-        "final_std_pos": float(env.std_pos_hist[length - 1]),
-        "final_std_vel": float(env.std_vel_hist[length - 1]),
+        "converged": conv_step is not None,
+        "conv_step": conv_step,
+        "conn_rate": float(conn_hist.mean()),
+        "final_std_pos": float(std_pos[-1]),
+        "final_std_vel": float(std_vel[-1]),
+        "final_order_parameter": float(op_hist[-1]),
         "num_network_components": int(env.num_network_components()),
-        "is_network_connected": bool(env.is_network_connected()),
+        "is_network_connected": bool(conn_hist[-1]),
         "num_aligned_components": int(
             env.num_aligned_components(alignment_threshold=alignment_threshold)
         ),
-        "order_parameter": float(env.alignment_order_parameter()),
         "is_aligned_single_component": bool(
             env.is_aligned_single_component(alignment_threshold=alignment_threshold)
         ),
@@ -188,46 +250,74 @@ def run_episode(
     }
 
 
-def aggregate(episodes: List[dict]) -> dict:
-    if not episodes:
-        return {}
+def _aggregate_subset(subset: List[dict]) -> dict:
+    """Aggregate metrics over a subset of episodes."""
+
+    if not subset:
+        return {"count": 0}
 
     def arr(key, dtype=np.float64):
-        return np.array([e[key] for e in episodes], dtype=dtype)
+        return np.array([e[key] for e in subset], dtype=dtype)
 
     rewards = arr("reward_sum")
-    lengths = arr("length")
     pos = arr("final_std_pos")
     vel = arr("final_std_vel")
-    n_comp = arr("num_network_components", dtype=int)
-    is_conn = arr("is_network_connected").astype(bool)
-    n_aligned = arr("num_aligned_components", dtype=int)
+    op = arr("final_order_parameter")
+    conn_rate = arr("conn_rate")
+    is_conn_final = arr("is_network_connected").astype(bool)
     is_aligned = arr("is_aligned_single_component").astype(bool)
-    op = arr("order_parameter")
-    n_pos = arr("num_position_clusters", dtype=int)
-    is_single_pos = arr("is_single_position_cluster").astype(bool)
 
     return {
-        "num_episodes": len(episodes),
+        "count": len(subset),
         "reward_mean": float(rewards.mean()),
         "reward_std": float(rewards.std()),
-        "length_mean": float(lengths.mean()),
-        "length_std": float(lengths.std()),
-        "single_flock_rate": float(is_conn.mean()),
-        "mean_num_network_components": float(n_comp.mean()),
-        "max_num_network_components": int(n_comp.max()),
-        "aligned_single_component_rate": float(is_aligned.mean()),
-        "mean_num_aligned_components": float(n_aligned.mean()),
-        "order_parameter_mean": float(op.mean()),
-        "order_parameter_std": float(op.std()),
-        "single_position_cluster_rate": float(is_single_pos.mean()),
-        "mean_num_position_clusters": float(n_pos.mean()),
-        "max_num_position_clusters": int(n_pos.max()),
+        "final_order_parameter_mean": float(op.mean()),
+        "final_order_parameter_std": float(op.std()),
         "final_std_pos_mean": float(pos.mean()),
         "final_std_pos_std": float(pos.std()),
         "final_std_vel_mean": float(vel.mean()),
-        "final_std_vel_std": float(vel.std()),
+        "conn_rate_mean": float(conn_rate.mean()),
+        "single_flock_rate": float(is_conn_final.mean()),
+        "aligned_single_component_rate": float(is_aligned.mean()),
     }
+
+
+def aggregate(episodes: List[dict]) -> dict:
+    """Aggregate metrics with overall, converged-only, and non-converged-only splits."""
+
+    if not episodes:
+        return {}
+
+    lengths = np.array([e["length"] for e in episodes], dtype=np.int64)
+    converged_mask = np.array([e["converged"] for e in episodes], dtype=bool)
+    conv_steps = np.array(
+        [e["conv_step"] for e in episodes if e["conv_step"] is not None],
+        dtype=np.int64,
+    )
+
+    out = {
+        "num_episodes": len(episodes),
+        "length_mean": float(lengths.mean()),
+        "converged_rate": float(converged_mask.mean()),
+        "num_converged": int(converged_mask.sum()),
+        "num_not_converged": int((~converged_mask).sum()),
+        "all": _aggregate_subset(episodes),
+        "converged": _aggregate_subset(
+            [e for e, m in zip(episodes, converged_mask) if m]
+        ),
+        "not_converged": _aggregate_subset(
+            [e for e, m in zip(episodes, converged_mask) if not m]
+        ),
+    }
+    if conv_steps.size:
+        out["conv_step_p50"] = float(np.median(conv_steps))
+        out["conv_step_p90"] = float(np.percentile(conv_steps, 90))
+        out["conv_step_max"] = float(conv_steps.max())
+    else:
+        out["conv_step_p50"] = float("nan")
+        out["conv_step_p90"] = float("nan")
+        out["conv_step_max"] = float("nan")
+    return out
 
 
 # ---------------------------------------------------------------------- #
@@ -265,12 +355,21 @@ def evaluate_topology(
     max_steps: int,
     base_seed: int,
     alignment_threshold: float,
+    conv_window: int,
+    conv_pos_rate: float,
+    conv_op_rate: float,
 ) -> dict:
     env_config = make_env_config(num_agents, max_steps, topology_spec, thresholds)
 
     dec_episodes: List[dict] = []
-    cen_episodes: List[dict] = []
     acs_episodes: List[dict] = []
+
+    ep_kwargs = dict(
+        alignment_threshold=alignment_threshold,
+        conv_window=conv_window,
+        conv_pos_rate=conv_pos_rate,
+        conv_op_rate=conv_op_rate,
+    )
 
     for ep in range(num_episodes):
         seed = base_seed + ep
@@ -279,31 +378,21 @@ def evaluate_topology(
         env_dec.seed(seed)
         dec_episodes.append(
             run_episode(env_dec, max_steps, mode="decentralized",
-                        policy=policy, alignment_threshold=alignment_threshold)
-        )
-
-        env_cen = NetworkedLazyAgents(env_config)
-        env_cen.seed(seed)
-        cen_episodes.append(
-            run_episode(env_cen, max_steps, mode="centralized",
-                        policy=policy, alignment_threshold=alignment_threshold)
+                        policy=policy, **ep_kwargs)
         )
 
         env_acs = NetworkedLazyAgents(env_config)
         env_acs.seed(seed)
         acs_episodes.append(
-            run_episode(env_acs, max_steps, mode="acs",
-                        alignment_threshold=alignment_threshold)
+            run_episode(env_acs, max_steps, mode="acs", **ep_kwargs)
         )
 
     return {
         "topology_spec": topology_spec,
         "thresholds": thresholds,
         "decentralized": aggregate(dec_episodes),
-        "centralized": aggregate(cen_episodes),
         "acs": aggregate(acs_episodes),
         "decentralized_episodes": dec_episodes,
-        "centralized_episodes": cen_episodes,
         "acs_episodes": acs_episodes,
     }
 
@@ -314,7 +403,7 @@ def evaluate_topology(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_episodes", type=int, default=30)
+    parser.add_argument("--num_episodes", type=int, default=100)
     parser.add_argument("--num_agents", type=int, default=20)
     parser.add_argument("--max_steps", type=int, default=1500)
     parser.add_argument("--base_seed", type=int, default=2000)
@@ -326,6 +415,12 @@ def main():
     parser.add_argument("--pos_offset_mul", type=float, default=1.10)
     parser.add_argument("--vel_offset_mul", type=float, default=1.50)
     parser.add_argument("--alignment_threshold", type=float, default=0.95)
+    parser.add_argument("--conv_window", type=int, default=100,
+                        help="trailing-window length (steps) for convergence criterion")
+    parser.add_argument("--conv_pos_rate", type=float, default=2.0,
+                        help="max-min of std_pos in window must be below this")
+    parser.add_argument("--conv_op_rate", type=float, default=0.05,
+                        help="max-min of order parameter in window must be below this")
     parser.add_argument(
         "--output", type=str,
         default=os.path.join(THIS_DIR, "results", "checkpoint_eval_decentralized.json"),
@@ -371,18 +466,18 @@ def main():
 
     hdr = (
         f"{'topology':>16s} |"
-        f" {'dec R':>8s} {'cen R':>8s} {'acs R':>8s}"
-        f" | {'d-a':>6s} {'c-a':>6s}"
-        f" | {'d 1f%':>5s} {'c 1f%':>5s} {'a 1f%':>5s}"
-        f" | {'d op':>5s} {'c op':>5s} {'a op':>5s}"
-        f" | {'d pos':>6s} {'c pos':>6s} {'a pos':>6s}"
+        f" {'dec R':>8s} {'acs R':>8s}"
+        f" | {'d-a':>6s}"
+        f" | {'d cv%':>6s} {'a cv%':>6s}"
+        f" | {'d op':>5s} {'a op':>5s}"
+        f" | {'d pos':>6s} {'a pos':>6s}"
     )
     sep = "-" * len(hdr)
     print(sep)
     print(hdr)
     print(
-        "(dec=decentralized, cen=centralized, a=ACS; "
-        "d-a/c-a=reward gap vs ACS; 1f%=single-flock; op=order param; pos=final std_pos)"
+        "(dec=decentralized policy, acs=ACS baseline; "
+        "cv%=converged rate; op/pos from final step over all episodes)"
     )
     print(sep)
 
@@ -406,22 +501,25 @@ def main():
             max_steps=args.max_steps,
             base_seed=args.base_seed,
             alignment_threshold=args.alignment_threshold,
+            conv_window=args.conv_window,
+            conv_pos_rate=args.conv_pos_rate,
+            conv_op_rate=args.conv_op_rate,
         )
         t_topo = time.time() - t_topo
 
         d = out["decentralized"]
-        c = out["centralized"]
         a = out["acs"]
-        d_gap = d["reward_mean"] - a["reward_mean"]
-        c_gap = c["reward_mean"] - a["reward_mean"]
+        d_all = d["all"]
+        a_all = a["all"]
+        d_gap = d_all["reward_mean"] - a_all["reward_mean"]
 
         print(
             f"{label:>16s} |"
-            f" {d['reward_mean']:8.1f} {c['reward_mean']:8.1f} {a['reward_mean']:8.1f}"
-            f" | {d_gap:+6.0f} {c_gap:+6.0f}"
-            f" | {100*d['single_flock_rate']:4.0f}% {100*c['single_flock_rate']:4.0f}% {100*a['single_flock_rate']:4.0f}%"
-            f" | {d['order_parameter_mean']:5.3f} {c['order_parameter_mean']:5.3f} {a['order_parameter_mean']:5.3f}"
-            f" | {d['final_std_pos_mean']:6.1f} {c['final_std_pos_mean']:6.1f} {a['final_std_pos_mean']:6.1f}"
+            f" {d_all['reward_mean']:8.1f} {a_all['reward_mean']:8.1f}"
+            f" | {d_gap:+6.0f}"
+            f" | {100*d['converged_rate']:5.0f}% {100*a['converged_rate']:5.0f}%"
+            f" | {d_all['final_order_parameter_mean']:5.3f} {a_all['final_order_parameter_mean']:5.3f}"
+            f" | {d_all['final_std_pos_mean']:6.1f} {a_all['final_std_pos_mean']:6.1f}"
             f"  ({t_topo:.0f}s)"
         )
         results[label] = out

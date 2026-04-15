@@ -1,4 +1,7 @@
 CLAUDE.md
+.claude/
 __pycache__/
 *.pyc
-*log
+*.log
+*log.txt
+

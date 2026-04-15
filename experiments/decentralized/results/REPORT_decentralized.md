@@ -1,11 +1,10 @@
 # Decentralized checkpoint evaluation report
 
-This report compares the centralized checkpoint evaluated in three modes:
-- **Decentralized**: each agent observes only its topology neighbors (per-agent local frame, batched forward pass).
-- **Centralized**: all agents observe the full swarm (global frame, single forward pass) — the prior evaluation method.
-- **ACS**: fully-active ACS baseline (no learned policy).
+This report compares the centralized-trained checkpoint deployed with
+*decentralized* per-agent observation against the fully-active ACS
+baseline on a range of communication topologies.
 
-The FC topology is a sanity check: decentralized and centralized must be identical because every agent sees every other agent.
+**Convergence criterion.** An episode is *converged* if there exists a trailing window of `100` steps in which (a) connectivity held (single component every step), (b) `std_pos` varied by less than `2.0` m, and (c) the polar order parameter varied by less than `0.05`.
 
 ## Network topology descriptions
 
@@ -32,96 +31,136 @@ The FC topology is a sanity check: decentralized and centralized must be identic
 
 ## Metric definitions
 
-- **reward**: cumulative episode reward over the fixed horizon.
-- **1f%** (single flock rate): fraction of episodes where all agents form one connected component at the last step.
-- **op** (order parameter): `|mean(v_i)| / speed` — heading alignment (0 = random, 1 = perfectly aligned).
-- **pos** (final std_pos): `sqrt(Var(x) + Var(y))` at last step — spatial tightness.
-- **d-a**: reward gap between decentralized policy and ACS.
-- **c-a**: reward gap between centralized policy and ACS.
-- **d-c**: reward gap between decentralized and centralized — quantifies the cost of limiting information to local neighbors.
+- **R**: mean cumulative episode reward (higher = better).
+- **d-a**: reward gap between decentralized policy and ACS (positive = policy beats ACS).
+- **cv%**: fraction of episodes that meet the convergence criterion.
+- **p50 / p90** (conv step): median / 90-th percentile of the first-converged step across converged episodes.
+- **1f%**: fraction of episodes whose final step is a single network component ("single flock").
+- **conn%**: mean fraction of steps per episode in which the network was a single component.
+- **op**: polar order parameter at last step `|mean(v_i)| / speed` (0 = random, 1 = aligned).
+- **pos**: `sqrt(Var(x) + Var(y))` at last step — spatial tightness.
 
-## Results
+## Convergence budget
 
-| topology | dec R | cen R | acs R | d-a | c-a | d-c | dec 1f% | cen 1f% | acs 1f% | dec op | cen op | acs op | dec pos | cen pos | acs pos |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `fully_connected` | -251.8 | -251.7 | -329.4 | +78 | +78 | -0 | 100% | 100% | 100% | 1.000 | 1.000 | 1.000 | 39.5 | 39.5 | 39.6 |
-| `star` | -706.8 | -335.2 | -419.2 | -288 | +84 | -372 | 100% | 100% | 100% | 0.517 | 0.997 | 0.993 | 75.8 | 41.1 | 47.7 |
-| `wheel` | -730.0 | -461.4 | -752.7 | +23 | +291 | -269 | 100% | 100% | 100% | 0.640 | 0.964 | 0.782 | 66.6 | 53.8 | 55.5 |
-| `binary_tree` | -730.3 | -444.8 | -707.3 | -23 | +263 | -286 | 100% | 100% | 100% | 0.405 | 0.776 | 0.626 | 133.4 | 185.2 | 115.1 |
-| `line` | -721.6 | -482.5 | -723.4 | +2 | +241 | -239 | 100% | 100% | 100% | 0.431 | 0.709 | 0.591 | 195.1 | 359.2 | 191.6 |
-| `ring_k1` | -769.6 | -486.0 | -793.8 | +24 | +308 | -284 | 100% | 100% | 100% | 0.351 | 0.725 | 0.500 | 146.6 | 242.5 | 130.0 |
-| `ring_k2` | -750.7 | -478.8 | -805.9 | +55 | +327 | -272 | 100% | 100% | 100% | 0.569 | 0.825 | 0.615 | 85.8 | 123.9 | 76.0 |
-| `ring_k3` | -608.1 | -458.7 | -739.6 | +132 | +281 | -149 | 100% | 100% | 100% | 0.832 | 0.915 | 0.743 | 59.0 | 69.9 | 58.3 |
-| `mst` | -525.5 | -426.7 | -487.7 | -38 | +61 | -99 | 100% | 100% | 100% | 0.759 | 0.796 | 0.913 | 242.5 | 357.7 | 228.2 |
-| `delaunay` | -749.5 | -513.2 | -775.5 | +26 | +262 | -236 | 100% | 100% | 100% | 0.683 | 0.840 | 0.764 | 105.1 | 114.6 | 95.1 |
-| `knn_k5` | -325.7 | -344.5 | -324.2 | -1 | -20 | +19 | 30% | 21% | 35% | 0.771 | 0.681 | 0.775 | 886.2 | 901.1 | 839.8 |
-| `knn_k10` | -272.4 | -267.9 | -300.1 | +28 | +32 | -5 | 100% | 100% | 100% | 1.000 | 1.000 | 1.000 | 57.0 | 57.1 | 57.0 |
-| `knn_k15` | -249.1 | -248.2 | -296.9 | +48 | +49 | -1 | 100% | 100% | 100% | 1.000 | 1.000 | 1.000 | 44.1 | 44.0 | 44.2 |
-| `disk_R60` | -175.5 | -173.8 | -178.2 | +3 | +4 | -2 | 0% | 0% | 0% | 0.226 | 0.240 | 0.220 | 2202.9 | 2190.0 | 2208.1 |
-| `disk_R120` | -299.2 | -288.1 | -311.9 | +13 | +24 | -11 | 54% | 8% | 88% | 0.965 | 0.854 | 0.992 | 342.8 | 922.7 | 117.2 |
-| `er_p0.2` | -738.1 | -470.8 | -798.4 | +60 | +328 | -267 | 76% | 76% | 76% | 0.566 | 0.883 | 0.642 | 188.2 | 223.2 | 183.1 |
-| `er_p0.3` | -610.2 | -451.5 | -761.2 | +151 | +310 | -159 | 98% | 98% | 98% | 0.823 | 0.958 | 0.743 | 65.2 | 68.6 | 63.7 |
-| `er_p0.5` | -401.1 | -358.5 | -552.3 | +151 | +194 | -43 | 100% | 100% | 100% | 0.990 | 0.997 | 0.953 | 42.7 | 42.5 | 43.2 |
+| topology | dec cv% | acs cv% | dec p50 | dec p90 | dec max | acs p50 | acs p90 | acs max |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `fully_connected` | 100% | 100% | 331 | 471 | 694 | 395 | 721 | 1021 |
+| `star` | 43% | 100% | 1179 | 2171 | 2478 | 574 | 1300 | 2023 |
+| `wheel` | 63% | 77% | 1214 | 2045 | 2480 | 1153 | 1909 | 2473 |
+| `binary_tree` | 16% | 51% | 1852 | 2303 | 2451 | 1485 | 2182 | 2474 |
+| `line` | 16% | 48% | 1730 | 2209 | 2350 | 1784 | 2346 | 2498 |
+| `ring_k1` | 9% | 25% | 1556 | 1979 | 2403 | 1572 | 2110 | 2326 |
+| `ring_k2` | 35% | 51% | 1495 | 2201 | 2387 | 1476 | 2055 | 2470 |
+| `ring_k3` | 81% | 69% | 1223 | 1952 | 2303 | 1293 | 2197 | 2468 |
+| `mst` | 70% | 94% | 1424 | 2262 | 2494 | 1341 | 1932 | 2460 |
+| `delaunay` | 42% | 57% | 1581 | 2366 | 2496 | 1475 | 2213 | 2479 |
+| `knn_k5` | 34% | 37% | 820 | 1351 | 1874 | 608 | 795 | 909 |
+| `knn_k10` | 100% | 100% | 368 | 572 | 770 | 383 | 615 | 1206 |
+| `knn_k15` | 100% | 100% | 312 | 446 | 647 | 365 | 612 | 1031 |
+| `disk_R60` | 0% | 0% | - | - | - | - | - | - |
+| `disk_R120` | 58% | 83% | 425 | 599 | 747 | 417 | 649 | 1019 |
+| `er_p0.2` | 34% | 41% | 1407 | 2420 | 2498 | 1210 | 2172 | 2471 |
+| `er_p0.3` | 84% | 79% | 1024 | 2089 | 2486 | 1148 | 2185 | 2435 |
+| `er_p0.5` | 100% | 95% | 613 | 1278 | 2378 | 761 | 1569 | 2261 |
 
-## Information loss analysis (decentralized vs centralized)
+## Overall results (all episodes)
 
-This table isolates the effect of restricting each agent's observation to its local neighbors. Negative d-c means local info hurts; zero means no difference (FC or very dense topologies).
+| topology | dec R | acs R | d-a | dec 1f% | acs 1f% | dec conn% | acs conn% | dec op | acs op | dec pos | acs pos |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `fully_connected` | -351.7 | -425.3 | +74 | 100% | 100% | 100% | 100% | 1.000 | 1.000 | 39.5 | 39.6 |
+| `star` | -1060.3 | -530.5 | -530 | 100% | 100% | 100% | 100% | 0.642 | 1.000 | 67.9 | 47.0 |
+| `wheel` | -1018.0 | -1014.2 | -4 | 100% | 100% | 100% | 100% | 0.808 | 0.868 | 61.0 | 53.6 |
+| `binary_tree` | -1168.0 | -1030.8 | -137 | 100% | 100% | 100% | 100% | 0.468 | 0.736 | 133.1 | 108.8 |
+| `line` | -1123.7 | -1021.8 | -102 | 100% | 100% | 100% | 100% | 0.498 | 0.746 | 202.2 | 192.6 |
+| `ring_k1` | -1230.8 | -1211.3 | -19 | 100% | 100% | 100% | 100% | 0.393 | 0.579 | 149.0 | 136.6 |
+| `ring_k2` | -1145.5 | -1153.2 | +8 | 100% | 100% | 100% | 100% | 0.653 | 0.731 | 85.3 | 73.7 |
+| `ring_k3` | -821.3 | -1049.6 | +228 | 100% | 100% | 100% | 100% | 0.894 | 0.847 | 56.3 | 55.4 |
+| `mst` | -726.7 | -611.6 | -115 | 100% | 100% | 100% | 100% | 0.894 | 0.988 | 228.8 | 216.9 |
+| `delaunay` | -1115.4 | -1100.8 | -15 | 100% | 100% | 100% | 100% | 0.805 | 0.856 | 98.7 | 93.5 |
+| `knn_k5` | -430.4 | -419.1 | -11 | 34% | 36% | 39% | 41% | 0.786 | 0.787 | 1459.0 | 1413.5 |
+| `knn_k10` | -373.5 | -395.2 | +22 | 100% | 100% | 100% | 100% | 1.000 | 1.000 | 57.1 | 56.7 |
+| `knn_k15` | -350.1 | -391.6 | +42 | 100% | 100% | 100% | 100% | 1.000 | 1.000 | 44.2 | 44.1 |
+| `disk_R60` | -275.3 | -277.7 | +2 | 0% | 0% | 0% | 0% | 0.227 | 0.221 | 3658.8 | 3663.5 |
+| `disk_R120` | -397.8 | -412.7 | +15 | 58% | 83% | 59% | 83% | 0.962 | 0.986 | 587.4 | 239.0 |
+| `er_p0.2` | -1129.9 | -1210.6 | +81 | 80% | 80% | 80% | 80% | 0.675 | 0.725 | 255.9 | 227.9 |
+| `er_p0.3` | -806.0 | -1019.0 | +213 | 98% | 98% | 98% | 98% | 0.941 | 0.906 | 59.0 | 71.4 |
+| `er_p0.5` | -520.2 | -684.1 | +164 | 100% | 100% | 100% | 100% | 1.000 | 0.984 | 42.4 | 42.7 |
 
-| topology | d-c reward | dec op | cen op | op drop | dec pos | cen pos | pos increase |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `fully_connected` | -0.1 | 1.000 | 1.000 | -0.000 | 39.5 | 39.5 | -0.0 |
-| `star` | -371.6 | 0.517 | 0.997 | -0.480 | 75.8 | 41.1 | +34.7 |
-| `wheel` | -268.5 | 0.640 | 0.964 | -0.324 | 66.6 | 53.8 | +12.9 |
-| `binary_tree` | -285.5 | 0.405 | 0.776 | -0.371 | 133.4 | 185.2 | -51.7 |
-| `line` | -239.0 | 0.431 | 0.709 | -0.279 | 195.1 | 359.2 | -164.1 |
-| `ring_k1` | -283.6 | 0.351 | 0.725 | -0.374 | 146.6 | 242.5 | -95.9 |
-| `ring_k2` | -271.8 | 0.569 | 0.825 | -0.256 | 85.8 | 123.9 | -38.1 |
-| `ring_k3` | -149.3 | 0.832 | 0.915 | -0.084 | 59.0 | 69.9 | -10.9 |
-| `mst` | -98.7 | 0.759 | 0.796 | -0.037 | 242.5 | 357.7 | -115.2 |
-| `delaunay` | -236.3 | 0.683 | 0.840 | -0.156 | 105.1 | 114.6 | -9.5 |
-| `knn_k5` | +18.8 | 0.771 | 0.681 | +0.090 | 886.2 | 901.1 | -14.9 |
-| `knn_k10` | -4.6 | 1.000 | 1.000 | +0.000 | 57.0 | 57.1 | -0.1 |
-| `knn_k15` | -0.9 | 1.000 | 1.000 | +0.000 | 44.1 | 44.0 | +0.1 |
-| `disk_R60` | -1.7 | 0.226 | 0.240 | -0.014 | 2202.9 | 2190.0 | +12.9 |
-| `disk_R120` | -11.1 | 0.965 | 0.854 | +0.112 | 342.8 | 922.7 | -579.9 |
-| `er_p0.2` | -267.3 | 0.566 | 0.883 | -0.317 | 188.2 | 223.2 | -35.0 |
-| `er_p0.3` | -158.7 | 0.823 | 0.958 | -0.134 | 65.2 | 68.6 | -3.4 |
-| `er_p0.5` | -42.6 | 0.990 | 0.997 | -0.007 | 42.7 | 42.5 | +0.1 |
+## Converged-only metrics
+
+| topology | n dec | n acs | dec R | acs R | d-a | dec op | acs op | dec pos | acs pos |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `fully_connected` | 100 | 100 | -351.7 | -425.3 | +74 | 1.000 | 1.000 | 39.5 | 39.6 |
+| `star` | 43 | 100 | -713.0 | -530.5 | -183 | 1.000 | 1.000 | 49.8 | 47.0 |
+| `wheel` | 63 | 77 | -793.6 | -832.4 | +39 | 0.988 | 0.999 | 51.9 | 50.7 |
+| `binary_tree` | 16 | 51 | -881.0 | -796.9 | -84 | 0.966 | 0.999 | 92.1 | 95.1 |
+| `line` | 16 | 48 | -726.6 | -813.2 | +87 | 0.996 | 0.979 | 169.2 | 203.7 |
+| `ring_k1` | 9 | 25 | -798.1 | -800.0 | +2 | 0.999 | 0.999 | 105.7 | 114.8 |
+| `ring_k2` | 35 | 51 | -799.9 | -842.4 | +42 | 0.999 | 0.999 | 68.1 | 64.3 |
+| `ring_k3` | 81 | 69 | -699.3 | -848.1 | +149 | 1.000 | 1.000 | 51.9 | 51.0 |
+| `mst` | 70 | 94 | -604.1 | -591.3 | -13 | 0.998 | 0.999 | 213.9 | 217.2 |
+| `delaunay` | 42 | 57 | -823.3 | -826.8 | +3 | 0.999 | 0.997 | 90.3 | 90.2 |
+| `knn_k5` | 34 | 37 | -445.3 | -417.6 | -28 | 1.000 | 0.998 | 107.2 | 130.0 |
+| `knn_k10` | 100 | 100 | -373.5 | -395.2 | +22 | 1.000 | 1.000 | 57.1 | 56.7 |
+| `knn_k15` | 100 | 100 | -350.1 | -391.6 | +42 | 1.000 | 1.000 | 44.2 | 44.1 |
+| `disk_R60` | 0 | 0 | - | - | - | - | - | - | - |
+| `disk_R120` | 58 | 83 | -399.1 | -412.0 | +13 | 1.000 | 1.000 | 41.0 | 41.2 |
+| `er_p0.2` | 34 | 41 | -827.5 | -859.7 | +32 | 0.999 | 1.000 | 55.7 | 55.6 |
+| `er_p0.3` | 84 | 79 | -707.2 | -873.4 | +166 | 1.000 | 1.000 | 46.8 | 47.7 |
+| `er_p0.5` | 100 | 95 | -520.2 | -638.6 | +118 | 1.000 | 1.000 | 42.4 | 42.4 |
+
+## Non-converged-only metrics
+
+| topology | n dec | n acs | dec R | acs R | d-a | dec op | acs op | dec pos | acs pos |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `fully_connected` | 0 | 0 | - | - | - | - | - | - | - |
+| `star` | 57 | 0 | -1322.3 | - | - | 0.372 | - | 81.6 | - |
+| `wheel` | 37 | 23 | -1400.0 | -1622.8 | +223 | 0.501 | 0.429 | 76.4 | 63.4 |
+| `binary_tree` | 84 | 49 | -1222.6 | -1274.3 | +52 | 0.373 | 0.462 | 140.9 | 122.9 |
+| `line` | 84 | 52 | -1199.3 | -1214.4 | +15 | 0.403 | 0.531 | 208.5 | 182.2 |
+| `ring_k1` | 91 | 75 | -1273.6 | -1348.4 | +75 | 0.333 | 0.439 | 153.3 | 143.9 |
+| `ring_k2` | 65 | 49 | -1331.7 | -1476.8 | +145 | 0.467 | 0.452 | 94.6 | 83.4 |
+| `ring_k3` | 19 | 31 | -1341.5 | -1498.1 | +157 | 0.442 | 0.508 | 75.0 | 65.0 |
+| `mst` | 30 | 6 | -1012.7 | -929.1 | -84 | 0.652 | 0.815 | 263.4 | 211.8 |
+| `delaunay` | 58 | 43 | -1326.9 | -1464.0 | +137 | 0.665 | 0.669 | 104.8 | 97.9 |
+| `knn_k5` | 66 | 63 | -422.7 | -420.0 | -3 | 0.676 | 0.663 | 2155.4 | 2167.3 |
+| `knn_k10` | 0 | 0 | - | - | - | - | - | - | - |
+| `knn_k15` | 0 | 0 | - | - | - | - | - | - | - |
+| `disk_R60` | 100 | 100 | -275.3 | -277.7 | +2 | 0.227 | 0.221 | 3658.8 | 3663.5 |
+| `disk_R120` | 42 | 17 | -396.2 | -416.3 | +20 | 0.910 | 0.918 | 1342.0 | 1204.7 |
+| `er_p0.2` | 66 | 59 | -1285.7 | -1454.4 | +169 | 0.508 | 0.534 | 359.0 | 347.6 |
+| `er_p0.3` | 16 | 21 | -1324.7 | -1566.8 | +242 | 0.633 | 0.551 | 122.7 | 160.6 |
+| `er_p0.5` | 0 | 5 | - | -1548.1 | - | - | 0.675 | - | 47.9 |
 
 ## Takeaways
 
-**Decentralized policy beats ACS** (reward gap > +10, comparable flock rate):
-- `fully_connected`: dec-acs **+78**, info loss (dec-cen) **-0**, dec op **1.000**
-- `wheel`: dec-acs **+23**, info loss (dec-cen) **-269**, dec op **0.640**
-- `ring_k1`: dec-acs **+24**, info loss (dec-cen) **-284**, dec op **0.351**
-- `ring_k2`: dec-acs **+55**, info loss (dec-cen) **-272**, dec op **0.569**
-- `ring_k3`: dec-acs **+132**, info loss (dec-cen) **-149**, dec op **0.832**
-- `delaunay`: dec-acs **+26**, info loss (dec-cen) **-236**, dec op **0.683**
-- `knn_k10`: dec-acs **+28**, info loss (dec-cen) **-5**, dec op **1.000**
-- `knn_k15`: dec-acs **+48**, info loss (dec-cen) **-1**, dec op **1.000**
-- `er_p0.2`: dec-acs **+60**, info loss (dec-cen) **-267**, dec op **0.566**
-- `er_p0.3`: dec-acs **+151**, info loss (dec-cen) **-159**, dec op **0.823**
-- `er_p0.5`: dec-acs **+151**, info loss (dec-cen) **-43**, dec op **0.990**
+**Decentralized policy beats ACS overall** (reward gap > +10):
+- `fully_connected`: overall d-a **+74**, conv-only d-a **+74**, dec cv% **100%** vs acs cv% **100%**
+- `ring_k3`: overall d-a **+228**, conv-only d-a **+149**, dec cv% **81%** vs acs cv% **69%**
+- `knn_k10`: overall d-a **+22**, conv-only d-a **+22**, dec cv% **100%** vs acs cv% **100%**
+- `knn_k15`: overall d-a **+42**, conv-only d-a **+42**, dec cv% **100%** vs acs cv% **100%**
+- `disk_R120`: overall d-a **+15**, conv-only d-a **+13**, dec cv% **58%** vs acs cv% **83%**
+- `er_p0.2`: overall d-a **+81**, conv-only d-a **+32**, dec cv% **34%** vs acs cv% **41%**
+- `er_p0.3`: overall d-a **+213**, conv-only d-a **+166**, dec cv% **84%** vs acs cv% **79%**
+- `er_p0.5`: overall d-a **+164**, conv-only d-a **+118**, dec cv% **100%** vs acs cv% **95%**
 
-**Decentralized policy fails vs ACS** (worse reward or flock breakup):
-- `star`: dec-acs **-288**, dec 1f% **100%** vs acs **100%**
-- `binary_tree`: dec-acs **-23**, dec 1f% **100%** vs acs **100%**
-- `mst`: dec-acs **-38**, dec 1f% **100%** vs acs **100%**
-- `disk_R120`: dec-acs **+13**, dec 1f% **54%** vs acs **88%**
+**Decentralized policy fails vs ACS overall** (reward gap < -10):
+- `star`: overall d-a **-530**, conv-only d-a **-183**, dec cv% **43%** vs acs cv% **100%**
+- `binary_tree`: overall d-a **-137**, conv-only d-a **-84**, dec cv% **16%** vs acs cv% **51%**
+- `line`: overall d-a **-102**, conv-only d-a **+87**, dec cv% **16%** vs acs cv% **48%**
+- `ring_k1`: overall d-a **-19**, conv-only d-a **+2**, dec cv% **9%** vs acs cv% **25%**
+- `mst`: overall d-a **-115**, conv-only d-a **-13**, dec cv% **70%** vs acs cv% **94%**
+- `delaunay`: overall d-a **-15**, conv-only d-a **+3**, dec cv% **42%** vs acs cv% **57%**
+- `knn_k5`: overall d-a **-11**, conv-only d-a **-28**, dec cv% **34%** vs acs cv% **37%**
 
-**Significant information loss** (dec-cen reward gap < -20):
-- `star`: dec-cen **-372**, dec op **0.517** vs cen op **0.997**
-- `wheel`: dec-cen **-269**, dec op **0.640** vs cen op **0.964**
-- `binary_tree`: dec-cen **-286**, dec op **0.405** vs cen op **0.776**
-- `line`: dec-cen **-239**, dec op **0.431** vs cen op **0.709**
-- `ring_k1`: dec-cen **-284**, dec op **0.351** vs cen op **0.725**
-- `ring_k2`: dec-cen **-272**, dec op **0.569** vs cen op **0.825**
-- `ring_k3`: dec-cen **-149**, dec op **0.832** vs cen op **0.915**
-- `mst`: dec-cen **-99**, dec op **0.759** vs cen op **0.796**
-- `delaunay`: dec-cen **-236**, dec op **0.683** vs cen op **0.840**
-- `er_p0.2`: dec-cen **-267**, dec op **0.566** vs cen op **0.883**
-- `er_p0.3`: dec-cen **-159**, dec op **0.823** vs cen op **0.958**
-- `er_p0.5`: dec-cen **-43**, dec op **0.990** vs cen op **0.997**
+**Convergence rate differs significantly between dec and ACS** (|Δcv%| > 15 points):
+- `star`: dec cv% **43%** vs acs cv% **100%** (Δ -57 pts)
+- `binary_tree`: dec cv% **16%** vs acs cv% **51%** (Δ -35 pts)
+- `line`: dec cv% **16%** vs acs cv% **48%** (Δ -32 pts)
+- `ring_k1`: dec cv% **9%** vs acs cv% **25%** (Δ -16 pts)
+- `ring_k2`: dec cv% **35%** vs acs cv% **51%** (Δ -16 pts)
+- `mst`: dec cv% **70%** vs acs cv% **94%** (Δ -24 pts)
+- `disk_R120`: dec cv% **58%** vs acs cv% **83%** (Δ -25 pts)
 
 ---
-*Generated from `eval_checkpoint_decentralized.py` — 400 episodes, max_steps=1500, num_agents=20*
+*Generated from `eval_checkpoint_decentralized.py` — 100 episodes, max_steps=2500, num_agents=20, conv window=100, pos_rate=2.0, op_rate=0.05*

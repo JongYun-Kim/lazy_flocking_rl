@@ -1,15 +1,18 @@
 """
 Post-processes eval_checkpoint_decentralized.py JSON into a markdown report.
 
-The report compares three inference modes per topology:
+The report compares two inference modes per topology:
   - decentralized (per-agent local observation)
-  - centralized   (global observation, existing eval)
   - ACS baseline  (no learned policy)
+
+For every topology we report:
+  * convergence rate and convergence-step distribution (per mode),
+  * metrics aggregated over all episodes,
+  * metrics aggregated separately over converged and non-converged episodes.
 
 Usage
 -----
     python -m experiments.decentralized.build_decentralized_report \
-        --acs experiments/decentralized/results/acs_topology_sweep.json \
         --eval experiments/decentralized/results/checkpoint_eval_decentralized.json \
         --output experiments/decentralized/results/REPORT_decentralized.md
 """
@@ -18,43 +21,63 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
-import sys
 
 import numpy as np
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def _fmt(value, fmt: str) -> str:
+def _fmt_float(value, fmt: str) -> str:
     if value is None:
         return "-"
     try:
-        if isinstance(value, float) and np.isnan(value):
+        if isinstance(value, float) and math.isnan(value):
             return "-"
         return format(value, fmt)
     except (TypeError, ValueError):
         return "-"
 
 
-def _get(d: dict, key: str, default=float("nan")):
-    return d.get(key, default)
+def _fmt_pct(value) -> str:
+    if value is None:
+        return "-"
+    try:
+        if isinstance(value, float) and math.isnan(value):
+            return "-"
+        return f"{100 * value:.0f}%"
+    except (TypeError, ValueError):
+        return "-"
 
 
-def write_header(lines: list) -> None:
+def _fmt_int(value) -> str:
+    if value is None:
+        return "-"
+    try:
+        if isinstance(value, float) and math.isnan(value):
+            return "-"
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "-"
+
+
+def write_header(lines: list, eval_args: dict) -> None:
     lines.append("# Decentralized checkpoint evaluation report")
     lines.append("")
     lines.append(
-        "This report compares the centralized checkpoint evaluated in three modes:\n"
-        "- **Decentralized**: each agent observes only its topology neighbors "
-        "(per-agent local frame, batched forward pass).\n"
-        "- **Centralized**: all agents observe the full swarm (global frame, "
-        "single forward pass) — the prior evaluation method.\n"
-        "- **ACS**: fully-active ACS baseline (no learned policy).\n"
+        "This report compares the centralized-trained checkpoint deployed with\n"
+        "*decentralized* per-agent observation against the fully-active ACS\n"
+        "baseline on a range of communication topologies."
     )
+    lines.append("")
     lines.append(
-        "The FC topology is a sanity check: decentralized and centralized must "
-        "be identical because every agent sees every other agent."
+        f"**Convergence criterion.** An episode is *converged* if there exists "
+        f"a trailing window of `{eval_args.get('conv_window', '?')}` steps in "
+        f"which (a) connectivity held (single component every step), "
+        f"(b) `std_pos` varied by less than "
+        f"`{eval_args.get('conv_pos_rate', '?')}` m, and (c) the polar order "
+        f"parameter varied by less than `{eval_args.get('conv_op_rate', '?')}`."
     )
     lines.append("")
 
@@ -95,93 +118,124 @@ def write_metric_defs(lines: list) -> None:
     lines.append("## Metric definitions")
     lines.append("")
     lines.append(
-        "- **reward**: cumulative episode reward over the fixed horizon.\n"
-        "- **1f%** (single flock rate): fraction of episodes where all agents "
-        "form one connected component at the last step.\n"
-        "- **op** (order parameter): `|mean(v_i)| / speed` — heading alignment "
-        "(0 = random, 1 = perfectly aligned).\n"
-        "- **pos** (final std_pos): `sqrt(Var(x) + Var(y))` at last step — "
-        "spatial tightness.\n"
-        "- **d-a**: reward gap between decentralized policy and ACS.\n"
-        "- **c-a**: reward gap between centralized policy and ACS.\n"
-        "- **d-c**: reward gap between decentralized and centralized — "
-        "quantifies the cost of limiting information to local neighbors."
+        "- **R**: mean cumulative episode reward (higher = better).\n"
+        "- **d-a**: reward gap between decentralized policy and ACS "
+        "(positive = policy beats ACS).\n"
+        "- **cv%**: fraction of episodes that meet the convergence criterion.\n"
+        "- **p50 / p90** (conv step): median / 90-th percentile of the "
+        "first-converged step across converged episodes.\n"
+        "- **1f%**: fraction of episodes whose final step is a single network "
+        "component (\"single flock\").\n"
+        "- **conn%**: mean fraction of steps per episode in which the network "
+        "was a single component.\n"
+        "- **op**: polar order parameter at last step `|mean(v_i)| / speed` "
+        "(0 = random, 1 = aligned).\n"
+        "- **pos**: `sqrt(Var(x) + Var(y))` at last step — spatial tightness."
     )
     lines.append("")
 
 
-def write_main_table(eval_data: dict, lines: list) -> None:
-    lines.append("## Results")
+def write_convergence_table(eval_data: dict, lines: list) -> None:
+    lines.append("## Convergence budget")
     lines.append("")
     lines.append(
-        "| topology | dec R | cen R | acs R | d-a | c-a | d-c "
-        "| dec 1f% | cen 1f% | acs 1f% "
-        "| dec op | cen op | acs op "
-        "| dec pos | cen pos | acs pos |"
+        "| topology | dec cv% | acs cv% "
+        "| dec p50 | dec p90 | dec max "
+        "| acs p50 | acs p90 | acs max |"
     )
-    lines.append(
-        "|---|---:|---:|---:|---:|---:|---:"
-        "|---:|---:|---:"
-        "|---:|---:|---:"
-        "|---:|---:|---:|"
-    )
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for label, t in eval_data["topologies"].items():
         d = t["decentralized"]
-        c = t["centralized"]
         a = t["acs"]
+        lines.append(
+            f"| `{label}` "
+            f"| {_fmt_pct(d['converged_rate'])} "
+            f"| {_fmt_pct(a['converged_rate'])} "
+            f"| {_fmt_int(d.get('conv_step_p50'))} "
+            f"| {_fmt_int(d.get('conv_step_p90'))} "
+            f"| {_fmt_int(d.get('conv_step_max'))} "
+            f"| {_fmt_int(a.get('conv_step_p50'))} "
+            f"| {_fmt_int(a.get('conv_step_p90'))} "
+            f"| {_fmt_int(a.get('conv_step_max'))} |"
+        )
+    lines.append("")
+
+
+def write_overall_table(eval_data: dict, lines: list) -> None:
+    lines.append("## Overall results (all episodes)")
+    lines.append("")
+    lines.append(
+        "| topology | dec R | acs R | d-a "
+        "| dec 1f% | acs 1f% "
+        "| dec conn% | acs conn% "
+        "| dec op | acs op "
+        "| dec pos | acs pos |"
+    )
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for label, t in eval_data["topologies"].items():
+        d = t["decentralized"]["all"]
+        a = t["acs"]["all"]
         d_a = d["reward_mean"] - a["reward_mean"]
-        c_a = c["reward_mean"] - a["reward_mean"]
-        d_c = d["reward_mean"] - c["reward_mean"]
         lines.append(
             f"| `{label}` "
             f"| {d['reward_mean']:.1f} "
-            f"| {c['reward_mean']:.1f} "
             f"| {a['reward_mean']:.1f} "
             f"| {d_a:+.0f} "
-            f"| {c_a:+.0f} "
-            f"| {d_c:+.0f} "
-            f"| {100*d['single_flock_rate']:.0f}% "
-            f"| {100*c['single_flock_rate']:.0f}% "
-            f"| {100*a['single_flock_rate']:.0f}% "
-            f"| {d['order_parameter_mean']:.3f} "
-            f"| {c['order_parameter_mean']:.3f} "
-            f"| {a['order_parameter_mean']:.3f} "
+            f"| {_fmt_pct(d['single_flock_rate'])} "
+            f"| {_fmt_pct(a['single_flock_rate'])} "
+            f"| {_fmt_pct(d['conn_rate_mean'])} "
+            f"| {_fmt_pct(a['conn_rate_mean'])} "
+            f"| {d['final_order_parameter_mean']:.3f} "
+            f"| {a['final_order_parameter_mean']:.3f} "
             f"| {d['final_std_pos_mean']:.1f} "
-            f"| {c['final_std_pos_mean']:.1f} "
             f"| {a['final_std_pos_mean']:.1f} |"
         )
     lines.append("")
 
 
-def write_info_loss_table(eval_data: dict, lines: list) -> None:
-    lines.append("## Information loss analysis (decentralized vs centralized)")
+def write_split_table(eval_data: dict, lines: list, subset_key: str, title: str) -> None:
+    lines.append(f"## {title}")
     lines.append("")
     lines.append(
-        "This table isolates the effect of restricting each agent's observation "
-        "to its local neighbors. Negative d-c means local info hurts; zero means "
-        "no difference (FC or very dense topologies)."
+        "| topology | n dec | n acs | dec R | acs R | d-a "
+        "| dec op | acs op | dec pos | acs pos |"
     )
-    lines.append("")
-    lines.append(
-        "| topology | d-c reward | dec op | cen op | op drop "
-        "| dec pos | cen pos | pos increase |"
-    )
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for label, t in eval_data["topologies"].items():
-        d = t["decentralized"]
-        c = t["centralized"]
-        d_c = d["reward_mean"] - c["reward_mean"]
-        op_drop = d["order_parameter_mean"] - c["order_parameter_mean"]
-        pos_inc = d["final_std_pos_mean"] - c["final_std_pos_mean"]
+        d = t["decentralized"][subset_key]
+        a = t["acs"][subset_key]
+        if d.get("count", 0) == 0 and a.get("count", 0) == 0:
+            lines.append(
+                f"| `{label}` | 0 | 0 | - | - | - | - | - | - | - |"
+            )
+            continue
+        if d.get("count", 0) == 0:
+            d_r = d_op = d_pos = float("nan")
+        else:
+            d_r = d["reward_mean"]
+            d_op = d["final_order_parameter_mean"]
+            d_pos = d["final_std_pos_mean"]
+        if a.get("count", 0) == 0:
+            a_r = a_op = a_pos = float("nan")
+        else:
+            a_r = a["reward_mean"]
+            a_op = a["final_order_parameter_mean"]
+            a_pos = a["final_std_pos_mean"]
+        if not math.isnan(d_r) and not math.isnan(a_r):
+            d_a_txt = f"{d_r - a_r:+.0f}"
+        else:
+            d_a_txt = "-"
         lines.append(
             f"| `{label}` "
-            f"| {d_c:+.1f} "
-            f"| {d['order_parameter_mean']:.3f} "
-            f"| {c['order_parameter_mean']:.3f} "
-            f"| {op_drop:+.3f} "
-            f"| {d['final_std_pos_mean']:.1f} "
-            f"| {c['final_std_pos_mean']:.1f} "
-            f"| {pos_inc:+.1f} |"
+            f"| {d.get('count', 0)} "
+            f"| {a.get('count', 0)} "
+            f"| {_fmt_float(d_r, '.1f')} "
+            f"| {_fmt_float(a_r, '.1f')} "
+            f"| {d_a_txt} "
+            f"| {_fmt_float(d_op, '.3f')} "
+            f"| {_fmt_float(a_op, '.3f')} "
+            f"| {_fmt_float(d_pos, '.1f')} "
+            f"| {_fmt_float(a_pos, '.1f')} |"
         )
     lines.append("")
 
@@ -190,58 +244,71 @@ def write_takeaways(eval_data: dict, lines: list) -> None:
     lines.append("## Takeaways")
     lines.append("")
 
-    dec_beats_acs = []
-    dec_loses_acs = []
-    big_info_loss = []
+    dec_beats = []
+    dec_loses = []
+    mixed_conv = []
 
     for label, t in eval_data["topologies"].items():
         d = t["decentralized"]
-        c = t["centralized"]
         a = t["acs"]
-        d_a = d["reward_mean"] - a["reward_mean"]
-        d_c = d["reward_mean"] - c["reward_mean"]
+        d_all = d["all"]
+        a_all = a["all"]
+        d_a_all = d_all["reward_mean"] - a_all["reward_mean"]
 
-        if d_a > 10 and d["single_flock_rate"] >= a["single_flock_rate"] - 0.05:
-            dec_beats_acs.append((label, d_a, d_c, d, c, a))
-        elif d_a < -10 or d["single_flock_rate"] < a["single_flock_rate"] - 0.10:
-            dec_loses_acs.append((label, d_a, d_c, d, c, a))
+        # Conv-conditioned dec-acs on converged subset
+        d_conv = d["converged"]
+        a_conv = a["converged"]
+        if d_conv.get("count", 0) > 0 and a_conv.get("count", 0) > 0:
+            d_a_conv = d_conv["reward_mean"] - a_conv["reward_mean"]
+        else:
+            d_a_conv = None
 
-        if d_c < -20:
-            big_info_loss.append((label, d_c, d, c))
+        if d_a_all > 10:
+            dec_beats.append((label, d_a_all, d_a_conv,
+                              d["converged_rate"], a["converged_rate"]))
+        elif d_a_all < -10:
+            dec_loses.append((label, d_a_all, d_a_conv,
+                              d["converged_rate"], a["converged_rate"]))
 
-    if dec_beats_acs:
+        if abs(d["converged_rate"] - a["converged_rate"]) > 0.15:
+            mixed_conv.append((label, d["converged_rate"], a["converged_rate"]))
+
+    if dec_beats:
         lines.append(
-            "**Decentralized policy beats ACS** (reward gap > +10, comparable flock rate):"
+            "**Decentralized policy beats ACS overall** (reward gap > +10):"
         )
-        for label, d_a, d_c, d, c, a in dec_beats_acs:
+        for label, d_a, d_a_conv, d_cv, a_cv in dec_beats:
+            conv_txt = (f", conv-only d-a **{d_a_conv:+.0f}**"
+                        if d_a_conv is not None else "")
             lines.append(
-                f"- `{label}`: dec-acs **{d_a:+.0f}**, "
-                f"info loss (dec-cen) **{d_c:+.0f}**, "
-                f"dec op **{d['order_parameter_mean']:.3f}**"
+                f"- `{label}`: overall d-a **{d_a:+.0f}**{conv_txt}, "
+                f"dec cv% **{100*d_cv:.0f}%** vs acs cv% **{100*a_cv:.0f}%**"
             )
         lines.append("")
 
-    if dec_loses_acs:
+    if dec_loses:
         lines.append(
-            "**Decentralized policy fails vs ACS** (worse reward or flock breakup):"
+            "**Decentralized policy fails vs ACS overall** (reward gap < -10):"
         )
-        for label, d_a, d_c, d, c, a in dec_loses_acs:
+        for label, d_a, d_a_conv, d_cv, a_cv in dec_loses:
+            conv_txt = (f", conv-only d-a **{d_a_conv:+.0f}**"
+                        if d_a_conv is not None else "")
             lines.append(
-                f"- `{label}`: dec-acs **{d_a:+.0f}**, "
-                f"dec 1f% **{100*d['single_flock_rate']:.0f}%** "
-                f"vs acs **{100*a['single_flock_rate']:.0f}%**"
+                f"- `{label}`: overall d-a **{d_a:+.0f}**{conv_txt}, "
+                f"dec cv% **{100*d_cv:.0f}%** vs acs cv% **{100*a_cv:.0f}%**"
             )
         lines.append("")
 
-    if big_info_loss:
+    if mixed_conv:
         lines.append(
-            "**Significant information loss** (dec-cen reward gap < -20):"
+            "**Convergence rate differs significantly between dec and ACS** "
+            "(|Δcv%| > 15 points):"
         )
-        for label, d_c, d, c in big_info_loss:
+        for label, d_cv, a_cv in mixed_conv:
             lines.append(
-                f"- `{label}`: dec-cen **{d_c:+.0f}**, "
-                f"dec op **{d['order_parameter_mean']:.3f}** "
-                f"vs cen op **{c['order_parameter_mean']:.3f}**"
+                f"- `{label}`: dec cv% **{100*d_cv:.0f}%** "
+                f"vs acs cv% **{100*a_cv:.0f}%** "
+                f"(Δ {100*(d_cv-a_cv):+.0f} pts)"
             )
         lines.append("")
 
@@ -264,21 +331,29 @@ def main():
     with open(args.eval) as f:
         eval_data = json.load(f)
 
+    eval_args = eval_data.get("args", {})
+
     lines: list = []
-    write_header(lines)
+    write_header(lines, eval_args)
     write_topology_descriptions(lines)
     write_metric_defs(lines)
-    write_main_table(eval_data, lines)
-    write_info_loss_table(eval_data, lines)
+    write_convergence_table(eval_data, lines)
+    write_overall_table(eval_data, lines)
+    write_split_table(eval_data, lines, "converged",
+                      "Converged-only metrics")
+    write_split_table(eval_data, lines, "not_converged",
+                      "Non-converged-only metrics")
     write_takeaways(eval_data, lines)
 
-    eval_args = eval_data.get("args", {})
     lines.append("---")
     lines.append(
         f"*Generated from `eval_checkpoint_decentralized.py` — "
         f"{eval_args.get('num_episodes', '?')} episodes, "
         f"max_steps={eval_args.get('max_steps', '?')}, "
-        f"num_agents={eval_args.get('num_agents', '?')}*"
+        f"num_agents={eval_args.get('num_agents', '?')}, "
+        f"conv window={eval_args.get('conv_window', '?')}, "
+        f"pos_rate={eval_args.get('conv_pos_rate', '?')}, "
+        f"op_rate={eval_args.get('conv_op_rate', '?')}*"
     )
     lines.append("")
 
