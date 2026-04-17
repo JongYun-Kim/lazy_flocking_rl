@@ -1,0 +1,96 @@
+{
+  "args": {
+    "num_episodes": 2,
+    "num_agents": 20,
+    "max_steps": 1000,
+    "base_seed": 42,
+    "checkpoint": "/workspace/bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
+    "output": "experiments/checkpoint_test_260416/results/smoke.json"
+  },
+  "env_config": {
+    "num_agents_max": 20,
+    "num_agents_min": 20,
+    "speed": 15,
+    "predefined_distance": 60,
+    "std_pos_converged": 45.0,
+    "std_vel_converged": 0.1,
+    "std_pos_rate_converged": 0.1,
+    "std_vel_rate_converged": 0.2,
+    "max_time_step": 1000,
+    "incomplete_episode_penalty": 0,
+    "normalize_obs": true,
+    "use_fixed_horizon": false,
+    "use_L2_norm": true,
+    "use_preprocessed_obs": true,
+    "auto_step": false
+  },
+  "policy": {
+    "num_episodes": 2,
+    "reward_mean": -89.23475861549377,
+    "reward_std": 4.082163713872433,
+    "length_mean": 619.5,
+    "length_std": 11.5,
+    "control_cost_mean": 27.284758615493192,
+    "control_cost_std": 2.932163713872402,
+    "final_std_pos_mean": 40.877064230643455,
+    "final_std_vel_mean": 0.09306399067385944,
+    "converged_rate": 1.0,
+    "num_converged": 2
+  },
+  "acs": {
+    "num_episodes": 2,
+    "reward_mean": -68.87358331307769,
+    "reward_std": 3.0156303755939007,
+    "length_mean": 414.0,
+    "length_std": 9.0,
+    "control_cost_mean": 27.47358331307732,
+    "control_cost_std": 2.1156303755938897,
+    "final_std_pos_mean": 39.45363617048622,
+    "final_std_vel_mean": 0.09726228740510079,
+    "converged_rate": 1.0,
+    "num_converged": 2
+  },
+  "paired": {
+    "reward_diff_mean": -20.361175302416086,
+    "reward_diff_std": 7.097794089466333,
+    "length_diff_mean": 205.5,
+    "control_cost_diff_mean": -0.18882469758412945,
+    "policy_beats_acs_reward_rate": 0.0
+  },
+  "policy_episodes": [
+    {
+      "reward_sum": -93.31692232936621,
+      "length": 631,
+      "control_cost_sum": 30.216922329365595,
+      "final_std_pos": 40.89994181089837,
+      "final_std_vel": 0.0970480544744875,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.15259490162134,
+      "length": 608,
+      "control_cost_sum": 24.35259490162079,
+      "final_std_pos": 40.854186650388534,
+      "final_std_vel": 0.08907992687323138,
+      "converged": true
+    }
+  ],
+  "acs_episodes": [
+    {
+      "reward_sum": -65.85795293748379,
+      "length": 405,
+      "control_cost_sum": 25.357952937483432,
+      "final_std_pos": 39.042508552211444,
+      "final_std_vel": 0.09760275269836124,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.88921368867159,
+      "length": 423,
+      "control_cost_sum": 29.58921368867121,
+      "final_std_pos": 39.86476378876099,
+      "final_std_vel": 0.09692182211184032,
+      "converged": true
+    }
+  ]
+}

@@ -1,0 +1,3264 @@
+{
+  "args": {
+    "num_episodes": 200,
+    "num_agents": 20,
+    "max_steps": 1000,
+    "base_seed": 42,
+    "checkpoint": "/workspace/bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
+    "output": "/workspace/experiments/checkpoint_test_260416/results/ckpt74_vs_acs.json"
+  },
+  "env_config": {
+    "num_agents_max": 20,
+    "num_agents_min": 20,
+    "speed": 15,
+    "predefined_distance": 60,
+    "std_pos_converged": 45.0,
+    "std_vel_converged": 0.1,
+    "std_pos_rate_converged": 0.1,
+    "std_vel_rate_converged": 0.2,
+    "max_time_step": 1000,
+    "incomplete_episode_penalty": 0,
+    "normalize_obs": true,
+    "use_fixed_horizon": false,
+    "use_L2_norm": true,
+    "use_preprocessed_obs": true,
+    "auto_step": false
+  },
+  "policy": {
+    "num_episodes": 200,
+    "reward_mean": -85.1149571826309,
+    "reward_std": 24.025681214569754,
+    "length_mean": 557.755,
+    "length_std": 150.0212150830675,
+    "control_cost_mean": 29.33945718263042,
+    "control_cost_std": 11.313587220114414,
+    "final_std_pos_mean": 39.557324111090104,
+    "final_std_vel_mean": 0.12506933519106508,
+    "converged_rate": 0.985,
+    "num_converged": 197
+  },
+  "acs": {
+    "num_episodes": 200,
+    "reward_mean": -114.55499798182399,
+    "reward_std": 49.5325836992985,
+    "length_mean": 664.52,
+    "length_std": 225.70961344169635,
+    "control_cost_mean": 48.10299798182404,
+    "control_cost_std": 29.3569580656933,
+    "final_std_pos_mean": 40.008501638549944,
+    "final_std_vel_mean": 0.49605099958871507,
+    "converged_rate": 0.845,
+    "num_converged": 169
+  },
+  "paired": {
+    "reward_diff_mean": 29.440040799193085,
+    "reward_diff_std": 52.40107516733414,
+    "length_diff_mean": -106.765,
+    "control_cost_diff_mean": -18.763540799193628,
+    "policy_beats_acs_reward_rate": 0.685
+  },
+  "policy_episodes": [
+    {
+      "reward_sum": -93.31692232936621,
+      "length": 631,
+      "control_cost_sum": 30.216922329365595,
+      "final_std_pos": 40.89994181089837,
+      "final_std_vel": 0.0970480544744875,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.15259490162134,
+      "length": 608,
+      "control_cost_sum": 24.35259490162079,
+      "final_std_pos": 40.854186650388534,
+      "final_std_vel": 0.08907992687323138,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.15431963652372,
+      "length": 477,
+      "control_cost_sum": 21.454319636523316,
+      "final_std_pos": 39.442472627698045,
+      "final_std_vel": 0.044673177582283306,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.63840512931347,
+      "length": 415,
+      "control_cost_sum": 23.138405129313092,
+      "final_std_pos": 38.138112787706554,
+      "final_std_vel": 0.09996008220866345,
+      "converged": true
+    },
+    {
+      "reward_sum": -81.18237326294184,
+      "length": 492,
+      "control_cost_sum": 31.982373262941373,
+      "final_std_pos": 38.187850173212674,
+      "final_std_vel": 0.09884735242329265,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.93749967217445,
+      "length": 493,
+      "control_cost_sum": 27.637499672173977,
+      "final_std_pos": 40.28230580905182,
+      "final_std_vel": 0.09398032856931257,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.60116241127253,
+      "length": 488,
+      "control_cost_sum": 22.801162411272056,
+      "final_std_pos": 38.06024239813449,
+      "final_std_vel": 0.09997001267964317,
+      "converged": true
+    },
+    {
+      "reward_sum": -115.10833518952131,
+      "length": 893,
+      "control_cost_sum": 25.808335189520285,
+      "final_std_pos": 41.702124863393756,
+      "final_std_vel": 0.09984147448035659,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.21211005747318,
+      "length": 690,
+      "control_cost_sum": 24.21211005747249,
+      "final_std_pos": 40.24319040928117,
+      "final_std_vel": 0.09621137952190108,
+      "converged": true
+    },
+    {
+      "reward_sum": -84.36435893923044,
+      "length": 564,
+      "control_cost_sum": 27.964358939229864,
+      "final_std_pos": 39.961002157900815,
+      "final_std_vel": 0.09692242933247287,
+      "converged": true
+    },
+    {
+      "reward_sum": -83.48570194095373,
+      "length": 561,
+      "control_cost_sum": 27.385701940953215,
+      "final_std_pos": 38.862962375354414,
+      "final_std_vel": 0.09310031562502409,
+      "converged": true
+    },
+    {
+      "reward_sum": -65.74955652654171,
+      "length": 426,
+      "control_cost_sum": 23.149556526541335,
+      "final_std_pos": 40.762148612403365,
+      "final_std_vel": 0.09969426923739144,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.507497549057,
+      "length": 621,
+      "control_cost_sum": 23.407497549056405,
+      "final_std_pos": 41.09631545341155,
+      "final_std_vel": 0.09856763431131738,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.14205761998892,
+      "length": 579,
+      "control_cost_sum": 34.24205761998841,
+      "final_std_pos": 37.614104839526696,
+      "final_std_vel": 0.09880445797119654,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.17821026593447,
+      "length": 581,
+      "control_cost_sum": 34.07821026593389,
+      "final_std_pos": 39.23096128559575,
+      "final_std_vel": 0.09303563458813026,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.65142718702555,
+      "length": 519,
+      "control_cost_sum": 27.751427187025055,
+      "final_std_pos": 40.22567771054332,
+      "final_std_vel": 0.09974943704393033,
+      "converged": true
+    },
+    {
+      "reward_sum": -203.1055620163679,
+      "length": 1000,
+      "control_cost_sum": 103.10556201636972,
+      "final_std_pos": 41.01260945803688,
+      "final_std_vel": 5.75120800883982,
+      "converged": false
+    },
+    {
+      "reward_sum": -51.160156704485416,
+      "length": 318,
+      "control_cost_sum": 19.36015670448521,
+      "final_std_pos": 37.59949140999984,
+      "final_std_vel": 0.09543794490233355,
+      "converged": true
+    },
+    {
+      "reward_sum": -126.69167419523001,
+      "length": 1000,
+      "control_cost_sum": 26.69167419522881,
+      "final_std_pos": 41.33878058378249,
+      "final_std_vel": 0.11485592109829348,
+      "converged": false
+    },
+    {
+      "reward_sum": -63.417136780917645,
+      "length": 386,
+      "control_cost_sum": 24.817136780917334,
+      "final_std_pos": 38.729591115293275,
+      "final_std_vel": 0.09964387042556293,
+      "converged": true
+    },
+    {
+      "reward_sum": -105.28809791058302,
+      "length": 749,
+      "control_cost_sum": 30.388097910582232,
+      "final_std_pos": 40.6398019428174,
+      "final_std_vel": 0.09998776260753175,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.9261552169919,
+      "length": 527,
+      "control_cost_sum": 41.22615521699138,
+      "final_std_pos": 38.60022165250037,
+      "final_std_vel": 0.09675464175601743,
+      "converged": true
+    },
+    {
+      "reward_sum": -70.30698657035828,
+      "length": 453,
+      "control_cost_sum": 25.006986570357885,
+      "final_std_pos": 39.801095887889744,
+      "final_std_vel": 0.09908073123607125,
+      "converged": true
+    },
+    {
+      "reward_sum": -73.31064416468143,
+      "length": 486,
+      "control_cost_sum": 24.710644164681003,
+      "final_std_pos": 39.18798843240843,
+      "final_std_vel": 0.09876085346117984,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.91416901350021,
+      "length": 465,
+      "control_cost_sum": 23.41416901349983,
+      "final_std_pos": 40.01356460058573,
+      "final_std_vel": 0.09744983228894084,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.55832897126675,
+      "length": 584,
+      "control_cost_sum": 35.15832897126613,
+      "final_std_pos": 38.047102736022936,
+      "final_std_vel": 0.07654161365875474,
+      "converged": true
+    },
+    {
+      "reward_sum": -73.9480043426156,
+      "length": 461,
+      "control_cost_sum": 27.848004342615152,
+      "final_std_pos": 39.243639177921246,
+      "final_std_vel": 0.09584167748047383,
+      "converged": true
+    },
+    {
+      "reward_sum": -75.16497745364904,
+      "length": 502,
+      "control_cost_sum": 24.964977453648558,
+      "final_std_pos": 39.576815390331745,
+      "final_std_vel": 0.09929008425257596,
+      "converged": true
+    },
+    {
+      "reward_sum": -95.14191967248917,
+      "length": 599,
+      "control_cost_sum": 35.24191967248855,
+      "final_std_pos": 41.30670509877872,
+      "final_std_vel": 0.09898822806136086,
+      "converged": true
+    },
+    {
+      "reward_sum": -118.58788558840752,
+      "length": 811,
+      "control_cost_sum": 37.48788558840667,
+      "final_std_pos": 40.84560338001301,
+      "final_std_vel": 0.09926068085966468,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.26273649185896,
+      "length": 422,
+      "control_cost_sum": 25.062736491858594,
+      "final_std_pos": 39.72862996244235,
+      "final_std_vel": 0.08107229553132729,
+      "converged": true
+    },
+    {
+      "reward_sum": -94.39018432050943,
+      "length": 630,
+      "control_cost_sum": 31.390184320508762,
+      "final_std_pos": 40.894985993553306,
+      "final_std_vel": 0.0979460017161927,
+      "converged": true
+    },
+    {
+      "reward_sum": -48.59050723910332,
+      "length": 312,
+      "control_cost_sum": 17.39050723910314,
+      "final_std_pos": 39.079893631914246,
+      "final_std_vel": 0.09734101218195498,
+      "converged": true
+    },
+    {
+      "reward_sum": -74.819539219141,
+      "length": 466,
+      "control_cost_sum": 28.2195392191406,
+      "final_std_pos": 38.81861429330236,
+      "final_std_vel": 0.09854852603334019,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.68263550847769,
+      "length": 524,
+      "control_cost_sum": 27.282635508477178,
+      "final_std_pos": 39.85214904855095,
+      "final_std_vel": 0.09981570819251023,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.8361042290926,
+      "length": 439,
+      "control_cost_sum": 23.936104229092205,
+      "final_std_pos": 39.71928510525223,
+      "final_std_vel": 0.09945168666160963,
+      "converged": true
+    },
+    {
+      "reward_sum": -94.81926023960114,
+      "length": 661,
+      "control_cost_sum": 28.719260239600484,
+      "final_std_pos": 40.06877879787894,
+      "final_std_vel": 0.0882516740851718,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.62187784165144,
+      "length": 503,
+      "control_cost_sum": 21.321877841651055,
+      "final_std_pos": 39.00220895778754,
+      "final_std_vel": 0.09996356578505804,
+      "converged": true
+    },
+    {
+      "reward_sum": -83.57437469810247,
+      "length": 530,
+      "control_cost_sum": 30.57437469810197,
+      "final_std_pos": 40.31471890393035,
+      "final_std_vel": 0.0984444819192065,
+      "converged": true
+    },
+    {
+      "reward_sum": -101.62014770507812,
+      "length": 754,
+      "control_cost_sum": 26.220147705077345,
+      "final_std_pos": 41.4787191480383,
+      "final_std_vel": 0.09886662406062632,
+      "converged": true
+    },
+    {
+      "reward_sum": -143.810958430171,
+      "length": 949,
+      "control_cost_sum": 48.91095843016991,
+      "final_std_pos": 41.68499417655036,
+      "final_std_vel": 0.09961744121833219,
+      "converged": true
+    },
+    {
+      "reward_sum": -51.666063100099564,
+      "length": 342,
+      "control_cost_sum": 17.466063100099348,
+      "final_std_pos": 37.561371374291085,
+      "final_std_vel": 0.09869278184968135,
+      "converged": true
+    },
+    {
+      "reward_sum": -121.91847216337919,
+      "length": 690,
+      "control_cost_sum": 52.918472163378446,
+      "final_std_pos": 40.07561943531371,
+      "final_std_vel": 0.09820670252091022,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.07368393242359,
+      "length": 384,
+      "control_cost_sum": 25.673683932423305,
+      "final_std_pos": 37.81197664891519,
+      "final_std_vel": 0.09957709373028786,
+      "converged": true
+    },
+    {
+      "reward_sum": -115.63702324032784,
+      "length": 697,
+      "control_cost_sum": 45.937023240327086,
+      "final_std_pos": 37.20134495102561,
+      "final_std_vel": 0.099071292051962,
+      "converged": true
+    },
+    {
+      "reward_sum": -110.16540904343128,
+      "length": 698,
+      "control_cost_sum": 40.36540904343055,
+      "final_std_pos": 40.930896410601825,
+      "final_std_vel": 0.09834247954915679,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.68090318143368,
+      "length": 406,
+      "control_cost_sum": 22.08090318143337,
+      "final_std_pos": 38.15551047038743,
+      "final_std_vel": 0.04118797727196615,
+      "converged": true
+    },
+    {
+      "reward_sum": -101.4441320747137,
+      "length": 605,
+      "control_cost_sum": 40.94413207471309,
+      "final_std_pos": 40.26129256184081,
+      "final_std_vel": 0.09674912003439831,
+      "converged": true
+    },
+    {
+      "reward_sum": -54.8998843729496,
+      "length": 351,
+      "control_cost_sum": 19.79988437294934,
+      "final_std_pos": 39.56918214066807,
+      "final_std_vel": 0.09312114811823732,
+      "converged": true
+    },
+    {
+      "reward_sum": -123.07845119386911,
+      "length": 788,
+      "control_cost_sum": 44.27845119386823,
+      "final_std_pos": 40.330786132753616,
+      "final_std_vel": 0.09955742362590961,
+      "converged": true
+    },
+    {
+      "reward_sum": -87.21737740933895,
+      "length": 647,
+      "control_cost_sum": 22.517377409338337,
+      "final_std_pos": 41.34763842588164,
+      "final_std_vel": 0.09838651514622972,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.75504375994205,
+      "length": 540,
+      "control_cost_sum": 26.755043759941568,
+      "final_std_pos": 38.32069065485432,
+      "final_std_vel": 0.09878595261852205,
+      "converged": true
+    },
+    {
+      "reward_sum": -129.6513102427125,
+      "length": 847,
+      "control_cost_sum": 44.951310242711656,
+      "final_std_pos": 39.13182550768152,
+      "final_std_vel": 0.0989987351389596,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.48346996307373,
+      "length": 476,
+      "control_cost_sum": 31.8834699630733,
+      "final_std_pos": 37.36361878438565,
+      "final_std_vel": 0.09852323197874725,
+      "converged": true
+    },
+    {
+      "reward_sum": -102.02783315628767,
+      "length": 670,
+      "control_cost_sum": 35.02783315628698,
+      "final_std_pos": 40.62290867049621,
+      "final_std_vel": 0.0998695784401076,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.23805101960897,
+      "length": 634,
+      "control_cost_sum": 28.838051019608304,
+      "final_std_pos": 39.2865118955355,
+      "final_std_vel": 0.09972245224922917,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.65825569629669,
+      "length": 449,
+      "control_cost_sum": 24.75825569629629,
+      "final_std_pos": 38.50418147602873,
+      "final_std_vel": 0.09979564237211475,
+      "converged": true
+    },
+    {
+      "reward_sum": -56.25094946473837,
+      "length": 373,
+      "control_cost_sum": 18.950949464738102,
+      "final_std_pos": 39.5446464633291,
+      "final_std_vel": 0.09995717737359276,
+      "converged": true
+    },
+    {
+      "reward_sum": -117.14609000086784,
+      "length": 737,
+      "control_cost_sum": 43.44609000086704,
+      "final_std_pos": 40.27747794390141,
+      "final_std_vel": 0.09814608278940411,
+      "converged": true
+    },
+    {
+      "reward_sum": -66.99264159053564,
+      "length": 457,
+      "control_cost_sum": 21.29264159053526,
+      "final_std_pos": 39.8853948528359,
+      "final_std_vel": 0.0996611723962828,
+      "converged": true
+    },
+    {
+      "reward_sum": -81.70558290183544,
+      "length": 590,
+      "control_cost_sum": 22.705582901834845,
+      "final_std_pos": 39.325460798903826,
+      "final_std_vel": 0.09898200757063386,
+      "converged": true
+    },
+    {
+      "reward_sum": -75.4662476554513,
+      "length": 469,
+      "control_cost_sum": 28.566247655450898,
+      "final_std_pos": 39.671863008805,
+      "final_std_vel": 0.09644769352276554,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.16150477528572,
+      "length": 481,
+      "control_cost_sum": 23.061504775285314,
+      "final_std_pos": 41.9819871779932,
+      "final_std_vel": 0.08475033457748321,
+      "converged": true
+    },
+    {
+      "reward_sum": -107.44109608978033,
+      "length": 682,
+      "control_cost_sum": 39.2410960897796,
+      "final_std_pos": 39.79668296454859,
+      "final_std_vel": 0.09905315189349591,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.09761495888233,
+      "length": 466,
+      "control_cost_sum": 20.497614958881897,
+      "final_std_pos": 39.22619329634934,
+      "final_std_vel": 0.09950947768389119,
+      "converged": true
+    },
+    {
+      "reward_sum": -113.58750073611736,
+      "length": 875,
+      "control_cost_sum": 26.08750073611638,
+      "final_std_pos": 40.09337078304633,
+      "final_std_vel": 0.09919474068534552,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.5498792603612,
+      "length": 493,
+      "control_cost_sum": 23.249879260360757,
+      "final_std_pos": 39.53061801455193,
+      "final_std_vel": 0.09929425931563139,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.84350435435772,
+      "length": 402,
+      "control_cost_sum": 21.643504354357404,
+      "final_std_pos": 40.05361640079648,
+      "final_std_vel": 0.09763337006524268,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.11741705238819,
+      "length": 522,
+      "control_cost_sum": 26.917417052387698,
+      "final_std_pos": 38.82319183990319,
+      "final_std_vel": 0.09997037607416284,
+      "converged": true
+    },
+    {
+      "reward_sum": -86.28727504611015,
+      "length": 583,
+      "control_cost_sum": 27.98727504610959,
+      "final_std_pos": 40.55211486723214,
+      "final_std_vel": 0.09936587589328935,
+      "converged": true
+    },
+    {
+      "reward_sum": -77.23812860995531,
+      "length": 516,
+      "control_cost_sum": 25.638128609954816,
+      "final_std_pos": 40.38407955000669,
+      "final_std_vel": 0.09858061400316132,
+      "converged": true
+    },
+    {
+      "reward_sum": -94.36924286931753,
+      "length": 706,
+      "control_cost_sum": 23.769242869316834,
+      "final_std_pos": 39.1302963981686,
+      "final_std_vel": 0.09968159386769869,
+      "converged": true
+    },
+    {
+      "reward_sum": -84.79560226202011,
+      "length": 596,
+      "control_cost_sum": 25.19560226201949,
+      "final_std_pos": 37.74662133241278,
+      "final_std_vel": 0.05125906339199285,
+      "converged": true
+    },
+    {
+      "reward_sum": -84.32692912220955,
+      "length": 598,
+      "control_cost_sum": 24.526929122208955,
+      "final_std_pos": 39.819885965967885,
+      "final_std_vel": 0.09960031994324922,
+      "converged": true
+    },
+    {
+      "reward_sum": -109.95364256203175,
+      "length": 686,
+      "control_cost_sum": 41.35364256203105,
+      "final_std_pos": 40.48373697255231,
+      "final_std_vel": 0.09773790461486283,
+      "converged": true
+    },
+    {
+      "reward_sum": -73.00408751517534,
+      "length": 470,
+      "control_cost_sum": 26.00408751517496,
+      "final_std_pos": 38.29883682400237,
+      "final_std_vel": 0.033059630567578636,
+      "converged": true
+    },
+    {
+      "reward_sum": -121.36685103923082,
+      "length": 737,
+      "control_cost_sum": 47.666851039230046,
+      "final_std_pos": 39.86954648718274,
+      "final_std_vel": 0.09929955278783933,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.5647421181202,
+      "length": 511,
+      "control_cost_sum": 25.46474211811969,
+      "final_std_pos": 40.405991179105314,
+      "final_std_vel": 0.09830266863468266,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.62249612808228,
+      "length": 419,
+      "control_cost_sum": 26.722496128081907,
+      "final_std_pos": 38.976667807607654,
+      "final_std_vel": 0.062130501915002974,
+      "converged": true
+    },
+    {
+      "reward_sum": -102.25059279054403,
+      "length": 744,
+      "control_cost_sum": 27.850592790543207,
+      "final_std_pos": 40.36252874659554,
+      "final_std_vel": 0.09809157890081735,
+      "converged": true
+    },
+    {
+      "reward_sum": -103.39954697340727,
+      "length": 625,
+      "control_cost_sum": 40.89954697340665,
+      "final_std_pos": 40.1964597468556,
+      "final_std_vel": 0.09908702073422301,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.41274842619896,
+      "length": 588,
+      "control_cost_sum": 20.61274842619838,
+      "final_std_pos": 40.71983880741583,
+      "final_std_vel": 0.0999885165159489,
+      "converged": true
+    },
+    {
+      "reward_sum": -91.45512421429157,
+      "length": 656,
+      "control_cost_sum": 25.85512421429089,
+      "final_std_pos": 39.56635178593731,
+      "final_std_vel": 0.09595124124568359,
+      "converged": true
+    },
+    {
+      "reward_sum": -124.21296502649784,
+      "length": 793,
+      "control_cost_sum": 44.91296502649694,
+      "final_std_pos": 40.14731899935747,
+      "final_std_vel": 0.09655610803441668,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.46481712162495,
+      "length": 504,
+      "control_cost_sum": 28.064817121624447,
+      "final_std_pos": 39.44730169356691,
+      "final_std_vel": 0.0999770975470014,
+      "converged": true
+    },
+    {
+      "reward_sum": -70.12482575327158,
+      "length": 466,
+      "control_cost_sum": 23.52482575327116,
+      "final_std_pos": 39.65058906864847,
+      "final_std_vel": 0.09867652463149817,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.98280923068523,
+      "length": 521,
+      "control_cost_sum": 26.882809230684774,
+      "final_std_pos": 39.565860696267194,
+      "final_std_vel": 0.09919514191059807,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.60067830234766,
+      "length": 408,
+      "control_cost_sum": 21.800678302347354,
+      "final_std_pos": 39.43443713499775,
+      "final_std_vel": 0.09834161056044281,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.41624730825424,
+      "length": 553,
+      "control_cost_sum": 30.116247308253683,
+      "final_std_pos": 39.30629814503412,
+      "final_std_vel": 0.09977123938494424,
+      "converged": true
+    },
+    {
+      "reward_sum": -53.143957145512104,
+      "length": 356,
+      "control_cost_sum": 17.5439571455119,
+      "final_std_pos": 39.80425362699445,
+      "final_std_vel": 0.09848994062954136,
+      "converged": true
+    },
+    {
+      "reward_sum": -74.09665556252003,
+      "length": 511,
+      "control_cost_sum": 22.996655562519685,
+      "final_std_pos": 38.447910459620246,
+      "final_std_vel": 0.0985045017493342,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.62180686742067,
+      "length": 369,
+      "control_cost_sum": 24.721806867420383,
+      "final_std_pos": 38.40028749925821,
+      "final_std_vel": 0.09727445058398512,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.95306433737278,
+      "length": 554,
+      "control_cost_sum": 30.55306433737222,
+      "final_std_pos": 39.09361884466274,
+      "final_std_vel": 0.09839846574767257,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.54701140522957,
+      "length": 463,
+      "control_cost_sum": 30.247011405229152,
+      "final_std_pos": 37.56305998459194,
+      "final_std_vel": 0.09757674281298515,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.04816057533026,
+      "length": 400,
+      "control_cost_sum": 18.048160575330037,
+      "final_std_pos": 39.85605666849563,
+      "final_std_vel": 0.09977693424914638,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.33091103285551,
+      "length": 392,
+      "control_cost_sum": 22.130911032855185,
+      "final_std_pos": 40.28635725971039,
+      "final_std_vel": 0.09882461408784726,
+      "converged": true
+    },
+    {
+      "reward_sum": -105.11662755161524,
+      "length": 688,
+      "control_cost_sum": 36.316627551614495,
+      "final_std_pos": 39.297154570490505,
+      "final_std_vel": 0.09972213418923324,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.66835812479258,
+      "length": 492,
+      "control_cost_sum": 20.468358124792164,
+      "final_std_pos": 39.45699320893299,
+      "final_std_vel": 0.09792227461879528,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.4784841760993,
+      "length": 591,
+      "control_cost_sum": 20.378484176098738,
+      "final_std_pos": 39.801008329289665,
+      "final_std_vel": 0.09720043243918766,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.80162124335766,
+      "length": 469,
+      "control_cost_sum": 25.901621243357237,
+      "final_std_pos": 39.88652706237507,
+      "final_std_vel": 0.09612113209237667,
+      "converged": true
+    },
+    {
+      "reward_sum": -52.52175283432007,
+      "length": 322,
+      "control_cost_sum": 20.32175283431983,
+      "final_std_pos": 38.55576595708865,
+      "final_std_vel": 0.09980130484447282,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.95862630754709,
+      "length": 553,
+      "control_cost_sum": 23.65862630754658,
+      "final_std_pos": 40.250102212123686,
+      "final_std_vel": 0.09699266139426069,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.02093056589365,
+      "length": 482,
+      "control_cost_sum": 27.820930565893217,
+      "final_std_pos": 38.75780055019782,
+      "final_std_vel": 0.09884887235731392,
+      "converged": true
+    },
+    {
+      "reward_sum": -87.36745397746563,
+      "length": 659,
+      "control_cost_sum": 21.467453977464988,
+      "final_std_pos": 41.10597692635609,
+      "final_std_vel": 0.09878074385988182,
+      "converged": true
+    },
+    {
+      "reward_sum": -60.23330496996641,
+      "length": 409,
+      "control_cost_sum": 19.333304969966168,
+      "final_std_pos": 39.26497405607541,
+      "final_std_vel": 0.09842239199860846,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.68436501920223,
+      "length": 418,
+      "control_cost_sum": 26.884365019201915,
+      "final_std_pos": 37.84625509796136,
+      "final_std_vel": 0.09725182361660234,
+      "converged": true
+    },
+    {
+      "reward_sum": -120.43871073424816,
+      "length": 837,
+      "control_cost_sum": 36.738710734247185,
+      "final_std_pos": 40.57977773272649,
+      "final_std_vel": 0.09966042424338019,
+      "converged": true
+    },
+    {
+      "reward_sum": -70.92967226356268,
+      "length": 470,
+      "control_cost_sum": 23.929672263562313,
+      "final_std_pos": 39.78853031980908,
+      "final_std_vel": 0.09839828791723237,
+      "converged": true
+    },
+    {
+      "reward_sum": -82.17787153273821,
+      "length": 490,
+      "control_cost_sum": 33.17787153273774,
+      "final_std_pos": 39.60788488582971,
+      "final_std_vel": 0.09927635008066311,
+      "converged": true
+    },
+    {
+      "reward_sum": -73.00985986739397,
+      "length": 501,
+      "control_cost_sum": 22.909859867393575,
+      "final_std_pos": 40.392660529809994,
+      "final_std_vel": 0.09920010032075921,
+      "converged": true
+    },
+    {
+      "reward_sum": -66.14414653927088,
+      "length": 406,
+      "control_cost_sum": 25.54414653927055,
+      "final_std_pos": 38.27053053411915,
+      "final_std_vel": 0.09828941679163461,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.91151332855225,
+      "length": 412,
+      "control_cost_sum": 23.711513328551874,
+      "final_std_pos": 40.34747243308371,
+      "final_std_vel": 0.09990665911330229,
+      "converged": true
+    },
+    {
+      "reward_sum": -87.5371495038271,
+      "length": 575,
+      "control_cost_sum": 30.03714950382648,
+      "final_std_pos": 40.629991303595794,
+      "final_std_vel": 0.09592743120383711,
+      "converged": true
+    },
+    {
+      "reward_sum": -91.95532175153494,
+      "length": 705,
+      "control_cost_sum": 21.455321751534175,
+      "final_std_pos": 39.341492558388154,
+      "final_std_vel": 0.09945454446902986,
+      "converged": true
+    },
+    {
+      "reward_sum": -151.0391180589795,
+      "length": 845,
+      "control_cost_sum": 66.53911805897998,
+      "final_std_pos": 40.04056573081244,
+      "final_std_vel": 0.09905590765201822,
+      "converged": true
+    },
+    {
+      "reward_sum": -79.80836230516434,
+      "length": 525,
+      "control_cost_sum": 27.308362305163833,
+      "final_std_pos": 39.49455125904176,
+      "final_std_vel": 0.09999494316100875,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.65736296772957,
+      "length": 369,
+      "control_cost_sum": 21.75736296772929,
+      "final_std_pos": 39.66165986206902,
+      "final_std_vel": 0.09845135945332653,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.42071245610714,
+      "length": 430,
+      "control_cost_sum": 25.42071245610678,
+      "final_std_pos": 38.6718876979969,
+      "final_std_vel": 0.09529495870009823,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.41300089657307,
+      "length": 525,
+      "control_cost_sum": 25.913000896572576,
+      "final_std_pos": 40.76686884976357,
+      "final_std_vel": 0.09871662136723969,
+      "converged": true
+    },
+    {
+      "reward_sum": -60.861941166222095,
+      "length": 419,
+      "control_cost_sum": 18.9619411662218,
+      "final_std_pos": 37.596766941323224,
+      "final_std_vel": 0.0744563663274894,
+      "converged": true
+    },
+    {
+      "reward_sum": -108.99485783278942,
+      "length": 708,
+      "control_cost_sum": 38.19485783278863,
+      "final_std_pos": 37.29152891687939,
+      "final_std_vel": 0.09910076668688178,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.47310153394938,
+      "length": 404,
+      "control_cost_sum": 24.07310153394911,
+      "final_std_pos": 37.886344117058,
+      "final_std_vel": 0.08090405531909096,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.46947627514601,
+      "length": 380,
+      "control_cost_sum": 20.46947627514571,
+      "final_std_pos": 39.59196596740976,
+      "final_std_vel": 0.09729985682864074,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.22028053551912,
+      "length": 466,
+      "control_cost_sum": 17.620280535518745,
+      "final_std_pos": 38.676436547309024,
+      "final_std_vel": 0.09737767559951198,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.39321715384722,
+      "length": 646,
+      "control_cost_sum": 25.79321715384652,
+      "final_std_pos": 39.21113204894674,
+      "final_std_vel": 0.09912849403476039,
+      "converged": true
+    },
+    {
+      "reward_sum": -104.29880966246128,
+      "length": 617,
+      "control_cost_sum": 42.59880966246064,
+      "final_std_pos": 40.478824624506814,
+      "final_std_vel": 0.0941912870750234,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.03056830912828,
+      "length": 542,
+      "control_cost_sum": 41.830568309127734,
+      "final_std_pos": 38.93562507338651,
+      "final_std_vel": 0.09902797726962831,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.60528624802828,
+      "length": 430,
+      "control_cost_sum": 21.605286248027948,
+      "final_std_pos": 38.922226632491316,
+      "final_std_vel": 0.09986963092273629,
+      "converged": true
+    },
+    {
+      "reward_sum": -108.75593639910221,
+      "length": 809,
+      "control_cost_sum": 27.855936399101353,
+      "final_std_pos": 39.82295042419283,
+      "final_std_vel": 0.09940937688647396,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.53088783472776,
+      "length": 489,
+      "control_cost_sum": 27.630887834727286,
+      "final_std_pos": 39.37712157763582,
+      "final_std_vel": 0.09911042925152048,
+      "converged": true
+    },
+    {
+      "reward_sum": -55.67246850579977,
+      "length": 377,
+      "control_cost_sum": 17.97246850579952,
+      "final_std_pos": 39.664834455907126,
+      "final_std_vel": 0.0931986123360594,
+      "converged": true
+    },
+    {
+      "reward_sum": -65.42158681899309,
+      "length": 400,
+      "control_cost_sum": 25.42158681899274,
+      "final_std_pos": 37.47762867104999,
+      "final_std_vel": 0.09773287744472002,
+      "converged": true
+    },
+    {
+      "reward_sum": -77.96013730764389,
+      "length": 588,
+      "control_cost_sum": 19.160137307643343,
+      "final_std_pos": 38.42894161427539,
+      "final_std_vel": 0.08689280719216601,
+      "converged": true
+    },
+    {
+      "reward_sum": -86.96708197146654,
+      "length": 604,
+      "control_cost_sum": 26.56708197146592,
+      "final_std_pos": 40.665235569198195,
+      "final_std_vel": 0.09774334918443124,
+      "converged": true
+    },
+    {
+      "reward_sum": -85.98809146136045,
+      "length": 603,
+      "control_cost_sum": 25.688091461359868,
+      "final_std_pos": 38.820770333387784,
+      "final_std_vel": 0.09953056793929883,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.02184248715639,
+      "length": 453,
+      "control_cost_sum": 30.72184248715595,
+      "final_std_pos": 38.57554628884184,
+      "final_std_vel": 0.0880540976040982,
+      "converged": true
+    },
+    {
+      "reward_sum": -84.57106509804726,
+      "length": 568,
+      "control_cost_sum": 27.771065098046744,
+      "final_std_pos": 40.37411593783739,
+      "final_std_vel": 0.09993636999892914,
+      "converged": true
+    },
+    {
+      "reward_sum": -113.9076600894332,
+      "length": 798,
+      "control_cost_sum": 34.107660089432294,
+      "final_std_pos": 40.607827076044714,
+      "final_std_vel": 0.0916192598220037,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.677986927330494,
+      "length": 409,
+      "control_cost_sum": 20.777986927330165,
+      "final_std_pos": 39.97576549669476,
+      "final_std_vel": 0.09866818246534616,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.2368175983429,
+      "length": 473,
+      "control_cost_sum": 30.93681759834249,
+      "final_std_pos": 38.27405364213081,
+      "final_std_vel": 0.08445024120667784,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.02799299359322,
+      "length": 505,
+      "control_cost_sum": 29.527992993592747,
+      "final_std_pos": 39.7269100030247,
+      "final_std_vel": 0.09998805735360808,
+      "converged": true
+    },
+    {
+      "reward_sum": -112.53838460147381,
+      "length": 869,
+      "control_cost_sum": 25.638384601472836,
+      "final_std_pos": 41.9042562048505,
+      "final_std_vel": 0.09984379233105771,
+      "converged": true
+    },
+    {
+      "reward_sum": -181.0100807622075,
+      "length": 938,
+      "control_cost_sum": 87.21008076220939,
+      "final_std_pos": 38.06039297072295,
+      "final_std_vel": 0.07885230658072509,
+      "converged": true
+    },
+    {
+      "reward_sum": -95.39646335691214,
+      "length": 670,
+      "control_cost_sum": 28.396463356911408,
+      "final_std_pos": 41.093896581466105,
+      "final_std_vel": 0.0993661076283084,
+      "converged": true
+    },
+    {
+      "reward_sum": -89.75855615735054,
+      "length": 617,
+      "control_cost_sum": 28.058556157349887,
+      "final_std_pos": 40.563451488550875,
+      "final_std_vel": 0.09947957019341909,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.55802209675312,
+      "length": 641,
+      "control_cost_sum": 32.45802209675249,
+      "final_std_pos": 40.291377501962494,
+      "final_std_vel": 0.09657055591261356,
+      "converged": true
+    },
+    {
+      "reward_sum": -99.15882007777691,
+      "length": 693,
+      "control_cost_sum": 29.858820077776244,
+      "final_std_pos": 40.35789257798662,
+      "final_std_vel": 0.0978558087496873,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.65641614049673,
+      "length": 498,
+      "control_cost_sum": 28.856416140496236,
+      "final_std_pos": 39.39825510153732,
+      "final_std_vel": 0.09924716871653763,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.95261251926422,
+      "length": 448,
+      "control_cost_sum": 24.152612519263847,
+      "final_std_pos": 39.78623338996471,
+      "final_std_vel": 0.09976162418135963,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.18545526266098,
+      "length": 518,
+      "control_cost_sum": 24.385455262660578,
+      "final_std_pos": 39.43864167667076,
+      "final_std_vel": 0.09764942587411775,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.87320004403591,
+      "length": 429,
+      "control_cost_sum": 20.973200044035543,
+      "final_std_pos": 39.35603578980715,
+      "final_std_vel": 0.05670660494083487,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.71109644323587,
+      "length": 487,
+      "control_cost_sum": 23.01109644323543,
+      "final_std_pos": 40.74215151044165,
+      "final_std_vel": 0.09785147865867619,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.85422902554274,
+      "length": 432,
+      "control_cost_sum": 21.65422902554233,
+      "final_std_pos": 39.68880492454806,
+      "final_std_vel": 0.09965223692769005,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.07957166433334,
+      "length": 613,
+      "control_cost_sum": 30.7795716643327,
+      "final_std_pos": 39.228818824802154,
+      "final_std_vel": 0.0984284316673035,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.20622092485428,
+      "length": 404,
+      "control_cost_sum": 22.806220924853953,
+      "final_std_pos": 38.91955815700369,
+      "final_std_vel": 0.09446638069058601,
+      "converged": true
+    },
+    {
+      "reward_sum": -160.41423814743757,
+      "length": 865,
+      "control_cost_sum": 73.91423814743882,
+      "final_std_pos": 40.10022539878766,
+      "final_std_vel": 0.09976752766715836,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.18548868596554,
+      "length": 568,
+      "control_cost_sum": 39.38548868596499,
+      "final_std_pos": 39.29150413736265,
+      "final_std_vel": 0.09779861558948043,
+      "converged": true
+    },
+    {
+      "reward_sum": -98.64507207274437,
+      "length": 604,
+      "control_cost_sum": 38.24507207274374,
+      "final_std_pos": 38.80717284639406,
+      "final_std_vel": 0.09831909698076279,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.54413914680481,
+      "length": 477,
+      "control_cost_sum": 24.844139146804455,
+      "final_std_pos": 37.38538501589054,
+      "final_std_vel": 0.09963726638498545,
+      "converged": true
+    },
+    {
+      "reward_sum": -70.86935720592737,
+      "length": 488,
+      "control_cost_sum": 22.06935720592693,
+      "final_std_pos": 38.63118980688246,
+      "final_std_vel": 0.09963522279211037,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.9082320407033,
+      "length": 582,
+      "control_cost_sum": 32.70823204070275,
+      "final_std_pos": 39.61487895211224,
+      "final_std_vel": 0.09969016457433726,
+      "converged": true
+    },
+    {
+      "reward_sum": -77.49919054657221,
+      "length": 561,
+      "control_cost_sum": 21.399190546571656,
+      "final_std_pos": 40.52215720942498,
+      "final_std_vel": 0.08473754085479367,
+      "converged": true
+    },
+    {
+      "reward_sum": -89.91150338202715,
+      "length": 546,
+      "control_cost_sum": 35.311503382026636,
+      "final_std_pos": 40.22833074987774,
+      "final_std_vel": 0.09903338977546078,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.48261321336031,
+      "length": 693,
+      "control_cost_sum": 23.182613213359573,
+      "final_std_pos": 38.772527670443665,
+      "final_std_vel": 0.09889659837876778,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.94363846629858,
+      "length": 601,
+      "control_cost_sum": 33.84363846629799,
+      "final_std_pos": 39.70225091143258,
+      "final_std_vel": 0.09036821327686878,
+      "converged": true
+    },
+    {
+      "reward_sum": -78.63256062567234,
+      "length": 531,
+      "control_cost_sum": 25.53256062567189,
+      "final_std_pos": 40.65332400129382,
+      "final_std_vel": 0.09962050824961786,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.76628661900759,
+      "length": 617,
+      "control_cost_sum": 35.066286619006924,
+      "final_std_pos": 38.568274670117205,
+      "final_std_vel": 0.09799916862025236,
+      "converged": true
+    },
+    {
+      "reward_sum": -152.92632646858692,
+      "length": 941,
+      "control_cost_sum": 58.82632646858588,
+      "final_std_pos": 39.43418799423825,
+      "final_std_vel": 0.09937449656550802,
+      "converged": true
+    },
+    {
+      "reward_sum": -60.49177275598049,
+      "length": 388,
+      "control_cost_sum": 21.691772755980168,
+      "final_std_pos": 38.53338209791961,
+      "final_std_vel": 0.0995062692823449,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.89221812039614,
+      "length": 427,
+      "control_cost_sum": 22.192218120395758,
+      "final_std_pos": 37.9630649573365,
+      "final_std_vel": 0.09955499625221662,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.32887993752956,
+      "length": 702,
+      "control_cost_sum": 26.12887993752882,
+      "final_std_pos": 40.1814733866911,
+      "final_std_vel": 0.09947615617328837,
+      "converged": true
+    },
+    {
+      "reward_sum": -97.65160553902388,
+      "length": 711,
+      "control_cost_sum": 26.55160553902315,
+      "final_std_pos": 37.72525035440682,
+      "final_std_vel": 0.0998646193613774,
+      "converged": true
+    },
+    {
+      "reward_sum": -95.0766098946333,
+      "length": 613,
+      "control_cost_sum": 33.77660989463266,
+      "final_std_pos": 40.0731330722304,
+      "final_std_vel": 0.09861281681345023,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.98565365374088,
+      "length": 503,
+      "control_cost_sum": 22.68565365374043,
+      "final_std_pos": 40.209227315112514,
+      "final_std_vel": 0.09941230036992914,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.17583353072405,
+      "length": 390,
+      "control_cost_sum": 24.17583353072371,
+      "final_std_pos": 39.55314754138083,
+      "final_std_vel": 0.07882642209780488,
+      "converged": true
+    },
+    {
+      "reward_sum": -111.63079582154751,
+      "length": 619,
+      "control_cost_sum": 49.73079582154685,
+      "final_std_pos": 38.671206508641916,
+      "final_std_vel": 0.09938033906119656,
+      "converged": true
+    },
+    {
+      "reward_sum": -121.9582498818636,
+      "length": 779,
+      "control_cost_sum": 44.05824988186273,
+      "final_std_pos": 39.35498744233847,
+      "final_std_vel": 0.09319212070681587,
+      "converged": true
+    },
+    {
+      "reward_sum": -55.174730107188225,
+      "length": 356,
+      "control_cost_sum": 19.574730107188,
+      "final_std_pos": 38.395686995814486,
+      "final_std_vel": 0.09809687206877662,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.06325955688953,
+      "length": 456,
+      "control_cost_sum": 23.463259556889135,
+      "final_std_pos": 39.57502262030997,
+      "final_std_vel": 0.099208652450732,
+      "converged": true
+    },
+    {
+      "reward_sum": -106.1753656193614,
+      "length": 666,
+      "control_cost_sum": 39.575365619360696,
+      "final_std_pos": 41.2002749388977,
+      "final_std_vel": 0.09759930452409807,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.20638738572598,
+      "length": 603,
+      "control_cost_sum": 35.906387385725374,
+      "final_std_pos": 40.852442578140874,
+      "final_std_vel": 0.09900657335270249,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.91070059686899,
+      "length": 454,
+      "control_cost_sum": 22.510700596868638,
+      "final_std_pos": 39.03625595516431,
+      "final_std_vel": 0.09742990428428944,
+      "converged": true
+    },
+    {
+      "reward_sum": -54.773836091160774,
+      "length": 357,
+      "control_cost_sum": 19.073836091160544,
+      "final_std_pos": 38.37980500584895,
+      "final_std_vel": 0.08101843542853789,
+      "converged": true
+    },
+    {
+      "reward_sum": -82.80232247710228,
+      "length": 510,
+      "control_cost_sum": 31.802322477101793,
+      "final_std_pos": 39.75345373678917,
+      "final_std_vel": 0.09763730933317016,
+      "converged": true
+    },
+    {
+      "reward_sum": -66.31780484318733,
+      "length": 428,
+      "control_cost_sum": 23.517804843187005,
+      "final_std_pos": 39.79129261937387,
+      "final_std_vel": 0.09705137841680446,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.132395677268505,
+      "length": 419,
+      "control_cost_sum": 21.23239567726812,
+      "final_std_pos": 39.849819488207885,
+      "final_std_vel": 0.09869402530834676,
+      "converged": true
+    },
+    {
+      "reward_sum": -98.41940750926733,
+      "length": 694,
+      "control_cost_sum": 29.019407509266582,
+      "final_std_pos": 40.81821867367963,
+      "final_std_vel": 0.09925595484166902,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.45623426884413,
+      "length": 431,
+      "control_cost_sum": 25.356234268843732,
+      "final_std_pos": 39.92504261689584,
+      "final_std_vel": 0.09976099252094761,
+      "converged": true
+    },
+    {
+      "reward_sum": -57.97309301048517,
+      "length": 363,
+      "control_cost_sum": 21.67309301048489,
+      "final_std_pos": 39.054874583565976,
+      "final_std_vel": 0.09988244430753808,
+      "converged": true
+    },
+    {
+      "reward_sum": -49.30960591137409,
+      "length": 321,
+      "control_cost_sum": 17.20960591137394,
+      "final_std_pos": 37.99889656347492,
+      "final_std_vel": 0.09887727040795838,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.21589999645948,
+      "length": 544,
+      "control_cost_sum": 35.81589999645896,
+      "final_std_pos": 39.650681253436204,
+      "final_std_vel": 0.09917823077262622,
+      "converged": true
+    },
+    {
+      "reward_sum": -99.32175796478987,
+      "length": 577,
+      "control_cost_sum": 41.621757964789296,
+      "final_std_pos": 39.441774458470384,
+      "final_std_vel": 0.09912384934575422,
+      "converged": true
+    },
+    {
+      "reward_sum": -55.0095933675766,
+      "length": 337,
+      "control_cost_sum": 21.30959336757636,
+      "final_std_pos": 38.143499221756244,
+      "final_std_vel": 0.09910213258205874,
+      "converged": true
+    },
+    {
+      "reward_sum": -77.77792944014072,
+      "length": 521,
+      "control_cost_sum": 25.677929440140215,
+      "final_std_pos": 39.57533546281642,
+      "final_std_vel": 0.09832479570410523,
+      "converged": true
+    },
+    {
+      "reward_sum": -56.33346366882324,
+      "length": 389,
+      "control_cost_sum": 17.433463668823002,
+      "final_std_pos": 39.64438424076379,
+      "final_std_vel": 0.09760463049361834,
+      "converged": true
+    },
+    {
+      "reward_sum": -153.35861863940954,
+      "length": 843,
+      "control_cost_sum": 69.0586186394103,
+      "final_std_pos": 40.35370287330754,
+      "final_std_vel": 0.09823507903455214,
+      "converged": true
+    },
+    {
+      "reward_sum": -127.86690751463175,
+      "length": 802,
+      "control_cost_sum": 47.666907514630886,
+      "final_std_pos": 39.41979074941756,
+      "final_std_vel": 0.09761766200017082,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.46149097383022,
+      "length": 428,
+      "control_cost_sum": 24.661490973829856,
+      "final_std_pos": 39.75034883699064,
+      "final_std_vel": 0.09780586567437562,
+      "converged": true
+    },
+    {
+      "reward_sum": -92.1132901981473,
+      "length": 663,
+      "control_cost_sum": 25.813290198146607,
+      "final_std_pos": 40.6232465039464,
+      "final_std_vel": 0.09792682788750458,
+      "converged": true
+    },
+    {
+      "reward_sum": -134.09765680879354,
+      "length": 1000,
+      "control_cost_sum": 34.09765680879239,
+      "final_std_pos": 40.87418538489456,
+      "final_std_vel": 0.2900181291315303,
+      "converged": false
+    }
+  ],
+  "acs_episodes": [
+    {
+      "reward_sum": -65.85795293748379,
+      "length": 405,
+      "control_cost_sum": 25.357952937483432,
+      "final_std_pos": 39.042508552211444,
+      "final_std_vel": 0.09760275269836124,
+      "converged": true
+    },
+    {
+      "reward_sum": -71.88921368867159,
+      "length": 423,
+      "control_cost_sum": 29.58921368867121,
+      "final_std_pos": 39.86476378876099,
+      "final_std_vel": 0.09692182211184032,
+      "converged": true
+    },
+    {
+      "reward_sum": -211.71789011359215,
+      "length": 1000,
+      "control_cost_sum": 111.71789011359459,
+      "final_std_pos": 41.1803204034212,
+      "final_std_vel": 1.328361616979306,
+      "converged": false
+    },
+    {
+      "reward_sum": -115.10127369314432,
+      "length": 761,
+      "control_cost_sum": 39.001273693143446,
+      "final_std_pos": 38.67397855344231,
+      "final_std_vel": 0.09778491466089886,
+      "converged": true
+    },
+    {
+      "reward_sum": -221.5548809170723,
+      "length": 1000,
+      "control_cost_sum": 121.55488091707474,
+      "final_std_pos": 44.00655566566137,
+      "final_std_vel": 4.541606285782664,
+      "converged": false
+    },
+    {
+      "reward_sum": -108.88734854012728,
+      "length": 649,
+      "control_cost_sum": 43.98734854012657,
+      "final_std_pos": 40.994815854844845,
+      "final_std_vel": 0.09846859040541675,
+      "converged": true
+    },
+    {
+      "reward_sum": -120.68947356194258,
+      "length": 726,
+      "control_cost_sum": 48.08947356194175,
+      "final_std_pos": 40.40099517425648,
+      "final_std_vel": 0.09859239457129965,
+      "converged": true
+    },
+    {
+      "reward_sum": -82.76393312215805,
+      "length": 527,
+      "control_cost_sum": 30.06393312215753,
+      "final_std_pos": 39.45623447981532,
+      "final_std_vel": 0.04765735379390786,
+      "converged": true
+    },
+    {
+      "reward_sum": -172.195611782372,
+      "length": 918,
+      "control_cost_sum": 80.39561178237368,
+      "final_std_pos": 39.6850317547826,
+      "final_std_vel": 0.09899289484727318,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.488863222301006,
+      "length": 410,
+      "control_cost_sum": 22.488863222300637,
+      "final_std_pos": 39.959402781420934,
+      "final_std_vel": 0.09909811389577002,
+      "converged": true
+    },
+    {
+      "reward_sum": -166.89416222274303,
+      "length": 906,
+      "control_cost_sum": 76.2941622227447,
+      "final_std_pos": 39.06865488240263,
+      "final_std_vel": 0.09944852293239913,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.84460666775703,
+      "length": 463,
+      "control_cost_sum": 26.544606667756618,
+      "final_std_pos": 39.07355486657202,
+      "final_std_vel": 0.09896412729880552,
+      "converged": true
+    },
+    {
+      "reward_sum": -114.65982357412577,
+      "length": 807,
+      "control_cost_sum": 33.95982357412485,
+      "final_std_pos": 41.720017383072026,
+      "final_std_vel": 0.09805277899914984,
+      "converged": true
+    },
+    {
+      "reward_sum": -156.2336370125413,
+      "length": 824,
+      "control_cost_sum": 73.83363701254278,
+      "final_std_pos": 39.69565282224324,
+      "final_std_vel": 0.09933021819276033,
+      "converged": true
+    },
+    {
+      "reward_sum": -122.69846993684769,
+      "length": 693,
+      "control_cost_sum": 53.39846993684691,
+      "final_std_pos": 39.25942653642199,
+      "final_std_vel": 0.0994705797084576,
+      "converged": true
+    },
+    {
+      "reward_sum": -152.0279709175229,
+      "length": 998,
+      "control_cost_sum": 52.227970917521716,
+      "final_std_pos": 41.734051406688955,
+      "final_std_vel": 0.09987534243836318,
+      "converged": true
+    },
+    {
+      "reward_sum": -190.81393487751484,
+      "length": 1000,
+      "control_cost_sum": 90.81393487751696,
+      "final_std_pos": 39.617876199175015,
+      "final_std_vel": 0.4491247558241076,
+      "converged": false
+    },
+    {
+      "reward_sum": -186.68262536078691,
+      "length": 937,
+      "control_cost_sum": 92.98262536078897,
+      "final_std_pos": 39.160541509598424,
+      "final_std_vel": 0.0956686936430626,
+      "converged": true
+    },
+    {
+      "reward_sum": -94.8985910564661,
+      "length": 514,
+      "control_cost_sum": 43.498591056465585,
+      "final_std_pos": 40.14479004926607,
+      "final_std_vel": 0.09713971895479401,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.46960519999266,
+      "length": 415,
+      "control_cost_sum": 20.969605199992294,
+      "final_std_pos": 38.66202233106709,
+      "final_std_vel": 0.09746490283072883,
+      "converged": true
+    },
+    {
+      "reward_sum": -52.355102866888046,
+      "length": 321,
+      "control_cost_sum": 20.255102866887817,
+      "final_std_pos": 38.141547814410316,
+      "final_std_vel": 0.08303156342117739,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.61918988823891,
+      "length": 396,
+      "control_cost_sum": 24.019189888238554,
+      "final_std_pos": 39.474685770921006,
+      "final_std_vel": 0.09834469129959014,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.29458837211132,
+      "length": 577,
+      "control_cost_sum": 32.594588372110714,
+      "final_std_pos": 41.5661013610252,
+      "final_std_vel": 0.09988006300549405,
+      "converged": true
+    },
+    {
+      "reward_sum": -229.47190882265568,
+      "length": 1000,
+      "control_cost_sum": 129.47190882265792,
+      "final_std_pos": 49.51561204373515,
+      "final_std_vel": 13.54229956537213,
+      "converged": false
+    },
+    {
+      "reward_sum": -100.22886102646589,
+      "length": 646,
+      "control_cost_sum": 35.628861026465195,
+      "final_std_pos": 40.36052395265076,
+      "final_std_vel": 0.0999719696239633,
+      "converged": true
+    },
+    {
+      "reward_sum": -172.89635614305735,
+      "length": 973,
+      "control_cost_sum": 75.59635614305948,
+      "final_std_pos": 40.76126712865923,
+      "final_std_vel": 0.09905088360462357,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.66672709584236,
+      "length": 396,
+      "control_cost_sum": 22.066727095842012,
+      "final_std_pos": 39.33599110550876,
+      "final_std_vel": 0.09945207776726155,
+      "converged": true
+    },
+    {
+      "reward_sum": -172.62236995249987,
+      "length": 940,
+      "control_cost_sum": 78.62236995250207,
+      "final_std_pos": 39.409651744954395,
+      "final_std_vel": 0.09978629544708145,
+      "converged": true
+    },
+    {
+      "reward_sum": -129.14379319548607,
+      "length": 666,
+      "control_cost_sum": 62.543793195485335,
+      "final_std_pos": 38.57591239157953,
+      "final_std_vel": 0.09950961197806726,
+      "converged": true
+    },
+    {
+      "reward_sum": -88.34833953529596,
+      "length": 516,
+      "control_cost_sum": 36.748339535295464,
+      "final_std_pos": 38.30089433547506,
+      "final_std_vel": 0.09887216762364781,
+      "converged": true
+    },
+    {
+      "reward_sum": -66.98934475332499,
+      "length": 401,
+      "control_cost_sum": 26.88934475332462,
+      "final_std_pos": 39.14082286908611,
+      "final_std_vel": 0.04165542953872976,
+      "converged": true
+    },
+    {
+      "reward_sum": -109.89576613903046,
+      "length": 634,
+      "control_cost_sum": 46.495766139029776,
+      "final_std_pos": 39.019807472699014,
+      "final_std_vel": 0.09888728999553226,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.60477350652218,
+      "length": 595,
+      "control_cost_sum": 21.10477350652158,
+      "final_std_pos": 41.30103863699184,
+      "final_std_vel": 0.09959614589648536,
+      "converged": true
+    },
+    {
+      "reward_sum": -120.48496260493994,
+      "length": 699,
+      "control_cost_sum": 50.58496260493917,
+      "final_std_pos": 39.7275152351959,
+      "final_std_vel": 0.07911040984886626,
+      "converged": true
+    },
+    {
+      "reward_sum": -210.30980876088142,
+      "length": 1000,
+      "control_cost_sum": 110.30980876088388,
+      "final_std_pos": 40.7677230319701,
+      "final_std_vel": 1.604561439788699,
+      "converged": false
+    },
+    {
+      "reward_sum": -48.29406975954771,
+      "length": 293,
+      "control_cost_sum": 18.99406975954751,
+      "final_std_pos": 37.850168525602584,
+      "final_std_vel": 0.06177127095441311,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.539749555289745,
+      "length": 370,
+      "control_cost_sum": 21.539749555289443,
+      "final_std_pos": 39.296603979494996,
+      "final_std_vel": 0.09871071142243304,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.44645728170872,
+      "length": 410,
+      "control_cost_sum": 22.446457281708362,
+      "final_std_pos": 39.4608235163098,
+      "final_std_vel": 0.09498287936987132,
+      "converged": true
+    },
+    {
+      "reward_sum": -169.17771710455418,
+      "length": 1000,
+      "control_cost_sum": 69.17771710455601,
+      "final_std_pos": 40.29399943973052,
+      "final_std_vel": 0.2644529870111689,
+      "converged": false
+    },
+    {
+      "reward_sum": -80.92376817762852,
+      "length": 490,
+      "control_cost_sum": 31.92376817762805,
+      "final_std_pos": 38.18539399405649,
+      "final_std_vel": 0.09853778657969325,
+      "converged": true
+    },
+    {
+      "reward_sum": -87.77016687393188,
+      "length": 505,
+      "control_cost_sum": 37.27016687393139,
+      "final_std_pos": 40.49277133667855,
+      "final_std_vel": 0.09933889725566339,
+      "converged": true
+    },
+    {
+      "reward_sum": -54.58906579762697,
+      "length": 348,
+      "control_cost_sum": 19.789065797626712,
+      "final_std_pos": 38.153475794576785,
+      "final_std_vel": 0.09959538344980928,
+      "converged": true
+    },
+    {
+      "reward_sum": -130.55248049646616,
+      "length": 734,
+      "control_cost_sum": 57.15248049646534,
+      "final_std_pos": 40.4075963307935,
+      "final_std_vel": 0.09992411483975573,
+      "converged": true
+    },
+    {
+      "reward_sum": -216.58532296866179,
+      "length": 1000,
+      "control_cost_sum": 116.58532296866424,
+      "final_std_pos": 41.25470873770756,
+      "final_std_vel": 2.5050151049888525,
+      "converged": false
+    },
+    {
+      "reward_sum": -96.9549788236618,
+      "length": 602,
+      "control_cost_sum": 36.75497882366116,
+      "final_std_pos": 41.06275644118847,
+      "final_std_vel": 0.0998997456519977,
+      "converged": true
+    },
+    {
+      "reward_sum": -157.95839110016823,
+      "length": 1000,
+      "control_cost_sum": 57.958391100167034,
+      "final_std_pos": 41.32966181638738,
+      "final_std_vel": 0.6422779525322855,
+      "converged": false
+    },
+    {
+      "reward_sum": -80.19126740098,
+      "length": 531,
+      "control_cost_sum": 27.09126740097946,
+      "final_std_pos": 40.44624330157344,
+      "final_std_vel": 0.08980607512765341,
+      "converged": true
+    },
+    {
+      "reward_sum": -121.7511285841465,
+      "length": 977,
+      "control_cost_sum": 24.051128584145342,
+      "final_std_pos": 40.88271191713681,
+      "final_std_vel": 0.09814124870398869,
+      "converged": true
+    },
+    {
+      "reward_sum": -120.70638383179903,
+      "length": 859,
+      "control_cost_sum": 34.80638383179805,
+      "final_std_pos": 41.67325189636809,
+      "final_std_vel": 0.09961411979375331,
+      "converged": true
+    },
+    {
+      "reward_sum": -107.16148299723864,
+      "length": 623,
+      "control_cost_sum": 44.861482997237985,
+      "final_std_pos": 39.3423446544579,
+      "final_std_vel": 0.07402654883424332,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.43213301897049,
+      "length": 557,
+      "control_cost_sum": 20.732133018969975,
+      "final_std_pos": 40.565672228888104,
+      "final_std_vel": 0.09948985861705369,
+      "converged": true
+    },
+    {
+      "reward_sum": -50.99098262190819,
+      "length": 308,
+      "control_cost_sum": 20.190982621907978,
+      "final_std_pos": 37.54228872208619,
+      "final_std_vel": 0.09777885496783913,
+      "converged": true
+    },
+    {
+      "reward_sum": -200.161231264472,
+      "length": 1000,
+      "control_cost_sum": 100.16123126447452,
+      "final_std_pos": 41.05625941095366,
+      "final_std_vel": 0.11252552206696419,
+      "converged": false
+    },
+    {
+      "reward_sum": -108.48260919749737,
+      "length": 754,
+      "control_cost_sum": 33.08260919749651,
+      "final_std_pos": 38.95132475889488,
+      "final_std_vel": 0.09958135526495544,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.31002283841372,
+      "length": 551,
+      "control_cost_sum": 35.210022838413146,
+      "final_std_pos": 40.153335477713895,
+      "final_std_vel": 0.09920012314989063,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.796686574816704,
+      "length": 425,
+      "control_cost_sum": 20.29668657481634,
+      "final_std_pos": 40.08533783162128,
+      "final_std_vel": 0.09780469533195499,
+      "converged": true
+    },
+    {
+      "reward_sum": -129.7846319153905,
+      "length": 697,
+      "control_cost_sum": 60.08463191538972,
+      "final_std_pos": 41.090168935325615,
+      "final_std_vel": 0.09785959773972533,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.87681696563959,
+      "length": 439,
+      "control_cost_sum": 18.976816965639205,
+      "final_std_pos": 39.35393100738736,
+      "final_std_vel": 0.09911573818338418,
+      "converged": true
+    },
+    {
+      "reward_sum": -113.18024311214685,
+      "length": 731,
+      "control_cost_sum": 40.08024311214605,
+      "final_std_pos": 40.49486623076537,
+      "final_std_vel": 0.09991960310662015,
+      "converged": true
+    },
+    {
+      "reward_sum": -89.36136142164469,
+      "length": 567,
+      "control_cost_sum": 32.66136142164411,
+      "final_std_pos": 41.12356310590655,
+      "final_std_vel": 0.0997955142535094,
+      "converged": true
+    },
+    {
+      "reward_sum": -48.704809218645096,
+      "length": 307,
+      "control_cost_sum": 18.00480921864489,
+      "final_std_pos": 38.86989554378543,
+      "final_std_vel": 0.09948072177227812,
+      "converged": true
+    },
+    {
+      "reward_sum": -81.36920660734177,
+      "length": 560,
+      "control_cost_sum": 25.369206607341177,
+      "final_std_pos": 41.14935230834842,
+      "final_std_vel": 0.0997961655647291,
+      "converged": true
+    },
+    {
+      "reward_sum": -73.88803923875093,
+      "length": 421,
+      "control_cost_sum": 31.78803923875055,
+      "final_std_pos": 38.09614266055303,
+      "final_std_vel": 0.07796626951261947,
+      "converged": true
+    },
+    {
+      "reward_sum": -174.14926466345787,
+      "length": 923,
+      "control_cost_sum": 81.8492646634598,
+      "final_std_pos": 40.93918438683425,
+      "final_std_vel": 0.09853727266751147,
+      "converged": true
+    },
+    {
+      "reward_sum": -76.81976014375687,
+      "length": 493,
+      "control_cost_sum": 27.51976014375638,
+      "final_std_pos": 38.56123116118235,
+      "final_std_vel": 0.09910777162626098,
+      "converged": true
+    },
+    {
+      "reward_sum": -172.98385678231716,
+      "length": 983,
+      "control_cost_sum": 74.683856782319,
+      "final_std_pos": 40.30939236136091,
+      "final_std_vel": 0.09847840711025292,
+      "converged": true
+    },
+    {
+      "reward_sum": -89.11813209950924,
+      "length": 622,
+      "control_cost_sum": 26.91813209950858,
+      "final_std_pos": 39.5949027008365,
+      "final_std_vel": 0.09938151422710223,
+      "converged": true
+    },
+    {
+      "reward_sum": -206.24265065789223,
+      "length": 1000,
+      "control_cost_sum": 106.24265065789473,
+      "final_std_pos": 41.4189338588638,
+      "final_std_vel": 3.024767225309808,
+      "converged": false
+    },
+    {
+      "reward_sum": -127.52863349020481,
+      "length": 699,
+      "control_cost_sum": 57.62863349020403,
+      "final_std_pos": 40.838621739932364,
+      "final_std_vel": 0.09584709380373672,
+      "converged": true
+    },
+    {
+      "reward_sum": -82.24106092751026,
+      "length": 480,
+      "control_cost_sum": 34.24106092750981,
+      "final_std_pos": 38.828546289602016,
+      "final_std_vel": 0.0882357191239221,
+      "converged": true
+    },
+    {
+      "reward_sum": -103.09085080772638,
+      "length": 540,
+      "control_cost_sum": 49.09085080772582,
+      "final_std_pos": 39.677055795928275,
+      "final_std_vel": 0.09983958243821046,
+      "converged": true
+    },
+    {
+      "reward_sum": -101.83172595500946,
+      "length": 628,
+      "control_cost_sum": 39.03172595500879,
+      "final_std_pos": 41.13061184259799,
+      "final_std_vel": 0.09802500347555998,
+      "converged": true
+    },
+    {
+      "reward_sum": -124.21463409811258,
+      "length": 805,
+      "control_cost_sum": 43.71463409811165,
+      "final_std_pos": 41.47775989370759,
+      "final_std_vel": 0.0999835603069166,
+      "converged": true
+    },
+    {
+      "reward_sum": -161.31622459739447,
+      "length": 1000,
+      "control_cost_sum": 61.316224597393266,
+      "final_std_pos": 41.05453004386105,
+      "final_std_vel": 0.42026950353712716,
+      "converged": false
+    },
+    {
+      "reward_sum": -55.85238229483366,
+      "length": 358,
+      "control_cost_sum": 20.052382294833397,
+      "final_std_pos": 39.092532418785524,
+      "final_std_vel": 0.09728384145318217,
+      "converged": true
+    },
+    {
+      "reward_sum": -103.56876564025879,
+      "length": 684,
+      "control_cost_sum": 35.168765640258044,
+      "final_std_pos": 41.389331029530545,
+      "final_std_vel": 0.09963619183794423,
+      "converged": true
+    },
+    {
+      "reward_sum": -101.76138227432966,
+      "length": 641,
+      "control_cost_sum": 37.66138227432898,
+      "final_std_pos": 41.73934882025642,
+      "final_std_vel": 0.09985115815109029,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.13065838813782,
+      "length": 508,
+      "control_cost_sum": 21.330658388137334,
+      "final_std_pos": 38.609991293995954,
+      "final_std_vel": 0.06584862305061717,
+      "converged": true
+    },
+    {
+      "reward_sum": -181.26695036143064,
+      "length": 1000,
+      "control_cost_sum": 81.26695036143265,
+      "final_std_pos": 40.910334469022445,
+      "final_std_vel": 0.18936884598253137,
+      "converged": false
+    },
+    {
+      "reward_sum": -70.23145370185375,
+      "length": 482,
+      "control_cost_sum": 22.031453701853287,
+      "final_std_pos": 38.24577900845513,
+      "final_std_vel": 0.09988178329168548,
+      "converged": true
+    },
+    {
+      "reward_sum": -107.85070496797562,
+      "length": 695,
+      "control_cost_sum": 38.35070496797484,
+      "final_std_pos": 40.22729895607615,
+      "final_std_vel": 0.0991573740868761,
+      "converged": true
+    },
+    {
+      "reward_sum": -87.6203727349639,
+      "length": 533,
+      "control_cost_sum": 34.320372734963335,
+      "final_std_pos": 40.02315256512595,
+      "final_std_vel": 0.09973615092842777,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.33713265508413,
+      "length": 538,
+      "control_cost_sum": 39.537132655083575,
+      "final_std_pos": 39.94907714230723,
+      "final_std_vel": 0.09922948575655353,
+      "converged": true
+    },
+    {
+      "reward_sum": -167.7134115099907,
+      "length": 887,
+      "control_cost_sum": 79.01341150999241,
+      "final_std_pos": 39.450938746215435,
+      "final_std_vel": 0.09873392722210288,
+      "converged": true
+    },
+    {
+      "reward_sum": -137.7334268167615,
+      "length": 706,
+      "control_cost_sum": 67.13342681676215,
+      "final_std_pos": 40.117760771673034,
+      "final_std_vel": 0.0986538327217686,
+      "converged": true
+    },
+    {
+      "reward_sum": -198.33723351359367,
+      "length": 988,
+      "control_cost_sum": 99.53723351359623,
+      "final_std_pos": 40.26922806840298,
+      "final_std_vel": 0.09037680402361178,
+      "converged": true
+    },
+    {
+      "reward_sum": -134.4059917628765,
+      "length": 765,
+      "control_cost_sum": 57.90599176287565,
+      "final_std_pos": 37.9347203012816,
+      "final_std_vel": 0.0991260517121321,
+      "converged": true
+    },
+    {
+      "reward_sum": -64.84397890418768,
+      "length": 415,
+      "control_cost_sum": 23.343978904187317,
+      "final_std_pos": 38.769806773539564,
+      "final_std_vel": 0.09963725979623055,
+      "converged": true
+    },
+    {
+      "reward_sum": -226.53899598121643,
+      "length": 1000,
+      "control_cost_sum": 126.53899598121889,
+      "final_std_pos": 42.35546568884639,
+      "final_std_vel": 8.879524333442781,
+      "converged": false
+    },
+    {
+      "reward_sum": -95.17236564308405,
+      "length": 525,
+      "control_cost_sum": 42.6723656430835,
+      "final_std_pos": 38.211663429957134,
+      "final_std_vel": 0.09986728732202955,
+      "converged": true
+    },
+    {
+      "reward_sum": -47.58225270360708,
+      "length": 302,
+      "control_cost_sum": 17.382252703606927,
+      "final_std_pos": 38.1771274666851,
+      "final_std_vel": 0.06357963556831606,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.9680613130331,
+      "length": 460,
+      "control_cost_sum": 26.968061313032667,
+      "final_std_pos": 41.54665657959032,
+      "final_std_vel": 0.09734363087826019,
+      "converged": true
+    },
+    {
+      "reward_sum": -228.5049746632576,
+      "length": 1000,
+      "control_cost_sum": 128.50497466326007,
+      "final_std_pos": 53.95472054206406,
+      "final_std_vel": 14.45279908258836,
+      "converged": false
+    },
+    {
+      "reward_sum": -220.55405765771866,
+      "length": 1000,
+      "control_cost_sum": 120.55405765772113,
+      "final_std_pos": 41.996368667415425,
+      "final_std_vel": 4.392437263810456,
+      "converged": false
+    },
+    {
+      "reward_sum": -79.1841673180461,
+      "length": 500,
+      "control_cost_sum": 29.18416731804561,
+      "final_std_pos": 37.71710386397891,
+      "final_std_vel": 0.09858334146574198,
+      "converged": true
+    },
+    {
+      "reward_sum": -205.6163090094924,
+      "length": 1000,
+      "control_cost_sum": 105.61630900949494,
+      "final_std_pos": 40.76861261148705,
+      "final_std_vel": 0.7056534239380057,
+      "converged": false
+    },
+    {
+      "reward_sum": -95.56913396716118,
+      "length": 567,
+      "control_cost_sum": 38.86913396716061,
+      "final_std_pos": 40.44351851514768,
+      "final_std_vel": 0.09482331309978148,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.498994171619415,
+      "length": 455,
+      "control_cost_sum": 17.99899417161904,
+      "final_std_pos": 38.325824443739,
+      "final_std_vel": 0.09924110573336449,
+      "converged": true
+    },
+    {
+      "reward_sum": -135.94587775319815,
+      "length": 680,
+      "control_cost_sum": 67.94587775319877,
+      "final_std_pos": 39.91160425034803,
+      "final_std_vel": 0.09799600511925582,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.29625079780817,
+      "length": 417,
+      "control_cost_sum": 20.596250797807837,
+      "final_std_pos": 38.91637414656631,
+      "final_std_vel": 0.09969171224589544,
+      "converged": true
+    },
+    {
+      "reward_sum": -119.84052363038063,
+      "length": 847,
+      "control_cost_sum": 35.14052363037964,
+      "final_std_pos": 40.502251053879355,
+      "final_std_vel": 0.09990445900947528,
+      "converged": true
+    },
+    {
+      "reward_sum": -197.7017273977399,
+      "length": 1000,
+      "control_cost_sum": 97.70172739774216,
+      "final_std_pos": 41.13868011678473,
+      "final_std_vel": 1.5313871479051893,
+      "converged": false
+    },
+    {
+      "reward_sum": -81.43938791006804,
+      "length": 524,
+      "control_cost_sum": 29.039387910067507,
+      "final_std_pos": 38.24481925322118,
+      "final_std_vel": 0.09800213232230381,
+      "converged": true
+    },
+    {
+      "reward_sum": -105.86220952868462,
+      "length": 811,
+      "control_cost_sum": 24.762209528683673,
+      "final_std_pos": 40.28020669720658,
+      "final_std_vel": 0.0998866987758276,
+      "converged": true
+    },
+    {
+      "reward_sum": -68.93541798740625,
+      "length": 482,
+      "control_cost_sum": 20.7354179874058,
+      "final_std_pos": 38.81756455854636,
+      "final_std_vel": 0.098049492383854,
+      "converged": true
+    },
+    {
+      "reward_sum": -88.15102857351303,
+      "length": 548,
+      "control_cost_sum": 33.351028573512494,
+      "final_std_pos": 40.48456565740474,
+      "final_std_vel": 0.09947412578350912,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.88574972003698,
+      "length": 607,
+      "control_cost_sum": 36.185749720036334,
+      "final_std_pos": 39.13669290735719,
+      "final_std_vel": 0.09672041304356056,
+      "converged": true
+    },
+    {
+      "reward_sum": -135.35545036941767,
+      "length": 718,
+      "control_cost_sum": 63.55545036941687,
+      "final_std_pos": 39.05836620267065,
+      "final_std_vel": 0.09803022969841635,
+      "converged": true
+    },
+    {
+      "reward_sum": -124.2246651276946,
+      "length": 861,
+      "control_cost_sum": 38.12466512769359,
+      "final_std_pos": 41.566049955979686,
+      "final_std_vel": 0.0998099271643818,
+      "converged": true
+    },
+    {
+      "reward_sum": -55.52343188226223,
+      "length": 341,
+      "control_cost_sum": 21.423431882261973,
+      "final_std_pos": 39.306767339267424,
+      "final_std_vel": 0.08380588103021643,
+      "converged": true
+    },
+    {
+      "reward_sum": -152.72459381073713,
+      "length": 970,
+      "control_cost_sum": 55.724593810735975,
+      "final_std_pos": 40.19165668455786,
+      "final_std_vel": 0.0990916597205296,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.83449830114841,
+      "length": 555,
+      "control_cost_sum": 41.33449830114783,
+      "final_std_pos": 41.02233170961039,
+      "final_std_vel": 0.09816637244378047,
+      "converged": true
+    },
+    {
+      "reward_sum": -160.2671292424202,
+      "length": 837,
+      "control_cost_sum": 76.56712924242167,
+      "final_std_pos": 40.210634280198406,
+      "final_std_vel": 0.0972017186211282,
+      "converged": true
+    },
+    {
+      "reward_sum": -191.02996072918177,
+      "length": 1000,
+      "control_cost_sum": 91.02996072918417,
+      "final_std_pos": 41.26808605952026,
+      "final_std_vel": 0.2644381591806508,
+      "converged": false
+    },
+    {
+      "reward_sum": -184.43037824332714,
+      "length": 1000,
+      "control_cost_sum": 84.43037824332902,
+      "final_std_pos": 41.47363843244211,
+      "final_std_vel": 0.5795094055912295,
+      "converged": false
+    },
+    {
+      "reward_sum": -120.48600574582815,
+      "length": 717,
+      "control_cost_sum": 48.78600574582735,
+      "final_std_pos": 40.85801063811379,
+      "final_std_vel": 0.0993562343547143,
+      "converged": true
+    },
+    {
+      "reward_sum": -95.82321694493294,
+      "length": 572,
+      "control_cost_sum": 38.62321694493236,
+      "final_std_pos": 41.187692346004674,
+      "final_std_vel": 0.09916556879807263,
+      "converged": true
+    },
+    {
+      "reward_sum": -107.71298678219318,
+      "length": 686,
+      "control_cost_sum": 39.11298678219242,
+      "final_std_pos": 40.597511550129745,
+      "final_std_vel": 0.09850931676185858,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.08118908107281,
+      "length": 583,
+      "control_cost_sum": 34.7811890810722,
+      "final_std_pos": 40.906975968510366,
+      "final_std_vel": 0.09920614041903657,
+      "converged": true
+    },
+    {
+      "reward_sum": -51.48986192792654,
+      "length": 320,
+      "control_cost_sum": 19.48986192792631,
+      "final_std_pos": 37.29857990572586,
+      "final_std_vel": 0.0988339453798466,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.03325667232275,
+      "length": 607,
+      "control_cost_sum": 29.333256672322104,
+      "final_std_pos": 40.288372049338975,
+      "final_std_vel": 0.09992030276008933,
+      "converged": true
+    },
+    {
+      "reward_sum": -117.47093861550093,
+      "length": 704,
+      "control_cost_sum": 47.07093861550013,
+      "final_std_pos": 40.80175722641009,
+      "final_std_vel": 0.0991891141639711,
+      "converged": true
+    },
+    {
+      "reward_sum": -133.53018701821566,
+      "length": 870,
+      "control_cost_sum": 46.53018701821463,
+      "final_std_pos": 41.211650687470495,
+      "final_std_vel": 0.09682267655871654,
+      "converged": true
+    },
+    {
+      "reward_sum": -84.8539612814784,
+      "length": 661,
+      "control_cost_sum": 18.753961281477732,
+      "final_std_pos": 35.700528763996466,
+      "final_std_vel": 0.09985068005778122,
+      "converged": true
+    },
+    {
+      "reward_sum": -62.15539149940014,
+      "length": 439,
+      "control_cost_sum": 18.25539149939981,
+      "final_std_pos": 40.065121005993326,
+      "final_std_vel": 0.09897606571871902,
+      "converged": true
+    },
+    {
+      "reward_sum": -176.35719545185566,
+      "length": 1000,
+      "control_cost_sum": 76.35719545185812,
+      "final_std_pos": 40.03623690908308,
+      "final_std_vel": 0.11027584341687685,
+      "converged": false
+    },
+    {
+      "reward_sum": -205.9516820013523,
+      "length": 1000,
+      "control_cost_sum": 105.95168200135467,
+      "final_std_pos": 40.400271099357056,
+      "final_std_vel": 0.40676625117977994,
+      "converged": false
+    },
+    {
+      "reward_sum": -120.8254386857152,
+      "length": 650,
+      "control_cost_sum": 55.82543868571449,
+      "final_std_pos": 38.61263465834404,
+      "final_std_vel": 0.09415324172004352,
+      "converged": true
+    },
+    {
+      "reward_sum": -124.63549611717463,
+      "length": 789,
+      "control_cost_sum": 45.735496117173724,
+      "final_std_pos": 40.04922918866595,
+      "final_std_vel": 0.09676307245694558,
+      "converged": true
+    },
+    {
+      "reward_sum": -132.22993028908968,
+      "length": 749,
+      "control_cost_sum": 57.32993028908882,
+      "final_std_pos": 39.089788595311575,
+      "final_std_vel": 0.0988032513524568,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.160081543028355,
+      "length": 431,
+      "control_cost_sum": 20.060081543028,
+      "final_std_pos": 40.379416039707614,
+      "final_std_vel": 0.09899342432230626,
+      "converged": true
+    },
+    {
+      "reward_sum": -224.9697454944253,
+      "length": 1000,
+      "control_cost_sum": 124.96974549442794,
+      "final_std_pos": 39.39420246224284,
+      "final_std_vel": 2.179467776040648,
+      "converged": false
+    },
+    {
+      "reward_sum": -167.9858847334981,
+      "length": 900,
+      "control_cost_sum": 77.9858847334998,
+      "final_std_pos": 39.85765080587593,
+      "final_std_vel": 0.09986801643448595,
+      "converged": true
+    },
+    {
+      "reward_sum": -178.86089146882296,
+      "length": 928,
+      "control_cost_sum": 86.0608914688248,
+      "final_std_pos": 38.61852913753148,
+      "final_std_vel": 0.09483091235438858,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.63440338522196,
+      "length": 492,
+      "control_cost_sum": 31.43440338522147,
+      "final_std_pos": 39.364648935527505,
+      "final_std_vel": 0.09911546314885326,
+      "converged": true
+    },
+    {
+      "reward_sum": -147.8258116543293,
+      "length": 776,
+      "control_cost_sum": 70.22581165433049,
+      "final_std_pos": 40.06162830117368,
+      "final_std_vel": 0.09811057746252069,
+      "converged": true
+    },
+    {
+      "reward_sum": -203.59125586599112,
+      "length": 1000,
+      "control_cost_sum": 103.59125586599362,
+      "final_std_pos": 40.587882216987325,
+      "final_std_vel": 0.5100369513866357,
+      "converged": false
+    },
+    {
+      "reward_sum": -101.73709497600794,
+      "length": 621,
+      "control_cost_sum": 39.63709497600728,
+      "final_std_pos": 37.39384901920799,
+      "final_std_vel": 0.09937529465597904,
+      "converged": true
+    },
+    {
+      "reward_sum": -67.3884439021349,
+      "length": 417,
+      "control_cost_sum": 25.68844390213451,
+      "final_std_pos": 39.13297790903209,
+      "final_std_vel": 0.09986865080150976,
+      "converged": true
+    },
+    {
+      "reward_sum": -107.29401217401028,
+      "length": 641,
+      "control_cost_sum": 43.19401217400958,
+      "final_std_pos": 40.84957849697894,
+      "final_std_vel": 0.09884426583401763,
+      "converged": true
+    },
+    {
+      "reward_sum": -126.57576283067465,
+      "length": 964,
+      "control_cost_sum": 30.17576283067349,
+      "final_std_pos": 41.90234722803316,
+      "final_std_vel": 0.0996216109474494,
+      "converged": true
+    },
+    {
+      "reward_sum": -42.93448778241873,
+      "length": 274,
+      "control_cost_sum": 15.534487782418813,
+      "final_std_pos": 38.24752430219447,
+      "final_std_vel": 0.052777825955041956,
+      "converged": true
+    },
+    {
+      "reward_sum": -119.13026539981365,
+      "length": 670,
+      "control_cost_sum": 52.130265399812906,
+      "final_std_pos": 39.29547493306769,
+      "final_std_vel": 0.09999440427109942,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.3874069750309,
+      "length": 383,
+      "control_cost_sum": 20.087406975030575,
+      "final_std_pos": 39.39092513415876,
+      "final_std_vel": 0.09958297689628659,
+      "converged": true
+    },
+    {
+      "reward_sum": -130.03599513322115,
+      "length": 778,
+      "control_cost_sum": 52.23599513322025,
+      "final_std_pos": 40.29871026991268,
+      "final_std_vel": 0.09983939596968178,
+      "converged": true
+    },
+    {
+      "reward_sum": -100.24696677178144,
+      "length": 637,
+      "control_cost_sum": 36.546966771780774,
+      "final_std_pos": 40.69019286182195,
+      "final_std_vel": 0.09995451326133482,
+      "converged": true
+    },
+    {
+      "reward_sum": -154.20075786858797,
+      "length": 874,
+      "control_cost_sum": 66.8007578685892,
+      "final_std_pos": 40.07852080701549,
+      "final_std_vel": 0.09875279050353904,
+      "converged": true
+    },
+    {
+      "reward_sum": -176.2185059413314,
+      "length": 973,
+      "control_cost_sum": 78.91850594133368,
+      "final_std_pos": 39.8809468414022,
+      "final_std_vel": 0.06862076131248158,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.17715283483267,
+      "length": 396,
+      "control_cost_sum": 21.577152834832315,
+      "final_std_pos": 37.634789415077115,
+      "final_std_vel": 0.09850800470013182,
+      "converged": true
+    },
+    {
+      "reward_sum": -59.25325234979391,
+      "length": 385,
+      "control_cost_sum": 20.753252349793616,
+      "final_std_pos": 38.015486171124394,
+      "final_std_vel": 0.09648133331678546,
+      "converged": true
+    },
+    {
+      "reward_sum": -57.240128211677074,
+      "length": 351,
+      "control_cost_sum": 22.14012821167678,
+      "final_std_pos": 38.38092157224937,
+      "final_std_vel": 0.0995448648163155,
+      "converged": true
+    },
+    {
+      "reward_sum": -75.5165054872632,
+      "length": 529,
+      "control_cost_sum": 22.616505487262668,
+      "final_std_pos": 38.728248405892124,
+      "final_std_vel": 0.09944553099723391,
+      "converged": true
+    },
+    {
+      "reward_sum": -176.0241671577096,
+      "length": 928,
+      "control_cost_sum": 83.22416715771132,
+      "final_std_pos": 39.98127820933284,
+      "final_std_vel": 0.09980605396679966,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.49471333622932,
+      "length": 480,
+      "control_cost_sum": 21.49471333622886,
+      "final_std_pos": 37.69211172405477,
+      "final_std_vel": 0.09680503094281581,
+      "converged": true
+    },
+    {
+      "reward_sum": -109.3614460080862,
+      "length": 640,
+      "control_cost_sum": 45.361446008085515,
+      "final_std_pos": 38.55087507883165,
+      "final_std_vel": 0.09787728743759154,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.30181102454662,
+      "length": 386,
+      "control_cost_sum": 24.701811024546284,
+      "final_std_pos": 40.36081973159227,
+      "final_std_vel": 0.09978308581815816,
+      "converged": true
+    },
+    {
+      "reward_sum": -72.57628335803747,
+      "length": 442,
+      "control_cost_sum": 28.376283358037046,
+      "final_std_pos": 39.633949008322936,
+      "final_std_vel": 0.09988588317912912,
+      "converged": true
+    },
+    {
+      "reward_sum": -128.06408137083054,
+      "length": 846,
+      "control_cost_sum": 43.46408137082955,
+      "final_std_pos": 40.86186365840862,
+      "final_std_vel": 0.027653544215495596,
+      "converged": true
+    },
+    {
+      "reward_sum": -125.3356796875596,
+      "length": 1000,
+      "control_cost_sum": 25.33567968755841,
+      "final_std_pos": 40.82369867842643,
+      "final_std_vel": 0.10049586996600485,
+      "converged": false
+    },
+    {
+      "reward_sum": -60.824786961078644,
+      "length": 395,
+      "control_cost_sum": 21.324786961078317,
+      "final_std_pos": 39.86777150924945,
+      "final_std_vel": 0.09928877109943625,
+      "converged": true
+    },
+    {
+      "reward_sum": -93.52503101527691,
+      "length": 645,
+      "control_cost_sum": 29.025031015276216,
+      "final_std_pos": 40.827535748330895,
+      "final_std_vel": 0.09926272033157618,
+      "converged": true
+    },
+    {
+      "reward_sum": -225.4692236930132,
+      "length": 1000,
+      "control_cost_sum": 125.46922369301579,
+      "final_std_pos": 42.656129683669775,
+      "final_std_vel": 5.885543762875889,
+      "converged": false
+    },
+    {
+      "reward_sum": -99.90604808181524,
+      "length": 702,
+      "control_cost_sum": 29.70604808181446,
+      "final_std_pos": 40.34643536741091,
+      "final_std_vel": 0.099861696080851,
+      "converged": true
+    },
+    {
+      "reward_sum": -56.51042176783085,
+      "length": 354,
+      "control_cost_sum": 21.110421767830577,
+      "final_std_pos": 39.87124457307348,
+      "final_std_vel": 0.0997778011102477,
+      "converged": true
+    },
+    {
+      "reward_sum": -132.51566325873137,
+      "length": 839,
+      "control_cost_sum": 48.61566325873041,
+      "final_std_pos": 39.66912616330566,
+      "final_std_vel": 0.09784968278715914,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.47955501824617,
+      "length": 539,
+      "control_cost_sum": 26.579555018245628,
+      "final_std_pos": 40.73613660900219,
+      "final_std_vel": 0.09980797099879259,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.69230153411627,
+      "length": 548,
+      "control_cost_sum": 35.892301534115695,
+      "final_std_pos": 38.711467745727084,
+      "final_std_vel": 0.09081123388568539,
+      "converged": true
+    },
+    {
+      "reward_sum": -48.86514553427696,
+      "length": 302,
+      "control_cost_sum": 18.665145534276764,
+      "final_std_pos": 38.22306570192307,
+      "final_std_vel": 0.04421557161566325,
+      "converged": true
+    },
+    {
+      "reward_sum": -56.905576564371586,
+      "length": 348,
+      "control_cost_sum": 22.10557656437131,
+      "final_std_pos": 39.32783916411437,
+      "final_std_vel": 0.06467941398074682,
+      "converged": true
+    },
+    {
+      "reward_sum": -89.90607556700706,
+      "length": 536,
+      "control_cost_sum": 36.306075567006516,
+      "final_std_pos": 39.715093692361954,
+      "final_std_vel": 0.069825719685148,
+      "converged": true
+    },
+    {
+      "reward_sum": -192.0725980401039,
+      "length": 1000,
+      "control_cost_sum": 92.07259804010648,
+      "final_std_pos": 41.624468565936965,
+      "final_std_vel": 0.46847303729024087,
+      "converged": false
+    },
+    {
+      "reward_sum": -120.01758854836226,
+      "length": 788,
+      "control_cost_sum": 41.217588548361356,
+      "final_std_pos": 41.04737923351395,
+      "final_std_vel": 0.09727498495043929,
+      "converged": true
+    },
+    {
+      "reward_sum": -179.6689820587635,
+      "length": 1000,
+      "control_cost_sum": 79.66898205876561,
+      "final_std_pos": 40.743335564019176,
+      "final_std_vel": 0.21976321977735624,
+      "converged": false
+    },
+    {
+      "reward_sum": -223.46834002435207,
+      "length": 1000,
+      "control_cost_sum": 123.46834002435457,
+      "final_std_pos": 41.653465713283865,
+      "final_std_vel": 2.988060270315302,
+      "converged": false
+    },
+    {
+      "reward_sum": -98.16708102822304,
+      "length": 590,
+      "control_cost_sum": 39.16708102822241,
+      "final_std_pos": 39.73703469993927,
+      "final_std_vel": 0.09867779069365443,
+      "converged": true
+    },
+    {
+      "reward_sum": -132.55144130438566,
+      "length": 742,
+      "control_cost_sum": 58.35144130438482,
+      "final_std_pos": 38.51280101278513,
+      "final_std_vel": 0.09926356550471498,
+      "converged": true
+    },
+    {
+      "reward_sum": -63.38117951899767,
+      "length": 433,
+      "control_cost_sum": 20.081179518997317,
+      "final_std_pos": 39.48512140629111,
+      "final_std_vel": 0.09955483492267855,
+      "converged": true
+    },
+    {
+      "reward_sum": -116.72271666675806,
+      "length": 606,
+      "control_cost_sum": 56.12271666675743,
+      "final_std_pos": 39.03933506426915,
+      "final_std_vel": 0.09830902300978928,
+      "converged": true
+    },
+    {
+      "reward_sum": -127.29363434761763,
+      "length": 1000,
+      "control_cost_sum": 27.293634347616404,
+      "final_std_pos": 41.78234959083944,
+      "final_std_vel": 0.10511423391524657,
+      "converged": false
+    },
+    {
+      "reward_sum": -81.94520422071218,
+      "length": 493,
+      "control_cost_sum": 32.64520422071171,
+      "final_std_pos": 39.69403088981159,
+      "final_std_vel": 0.09982500481658516,
+      "converged": true
+    },
+    {
+      "reward_sum": -80.40310479700565,
+      "length": 503,
+      "control_cost_sum": 30.103104797005155,
+      "final_std_pos": 40.50922578789335,
+      "final_std_vel": 0.09876868741846419,
+      "converged": true
+    },
+    {
+      "reward_sum": -96.35442083328962,
+      "length": 554,
+      "control_cost_sum": 40.954420833289056,
+      "final_std_pos": 39.33525378642972,
+      "final_std_vel": 0.09753792568291085,
+      "converged": true
+    },
+    {
+      "reward_sum": -66.8050103187561,
+      "length": 431,
+      "control_cost_sum": 23.705010318755715,
+      "final_std_pos": 41.58453623531125,
+      "final_std_vel": 0.09990395919523841,
+      "converged": true
+    },
+    {
+      "reward_sum": -134.06942335516214,
+      "length": 688,
+      "control_cost_sum": 65.26942335516247,
+      "final_std_pos": 39.56262887090104,
+      "final_std_vel": 0.09810195976581071,
+      "converged": true
+    },
+    {
+      "reward_sum": -129.93641754239798,
+      "length": 677,
+      "control_cost_sum": 62.23641754239723,
+      "final_std_pos": 40.15982313823826,
+      "final_std_vel": 0.09937904651752115,
+      "converged": true
+    },
+    {
+      "reward_sum": -115.66984631866217,
+      "length": 881,
+      "control_cost_sum": 27.569846318661128,
+      "final_std_pos": 42.00441568009519,
+      "final_std_vel": 0.0995475688077783,
+      "converged": true
+    },
+    {
+      "reward_sum": -56.46963019669056,
+      "length": 349,
+      "control_cost_sum": 21.569630196690287,
+      "final_std_pos": 39.51060271881717,
+      "final_std_vel": 0.0874131803426928,
+      "converged": true
+    },
+    {
+      "reward_sum": -90.79141962528229,
+      "length": 558,
+      "control_cost_sum": 34.9914196252817,
+      "final_std_pos": 40.55124397610412,
+      "final_std_vel": 0.09882413279847192,
+      "converged": true
+    },
+    {
+      "reward_sum": -57.24919558316469,
+      "length": 366,
+      "control_cost_sum": 20.649195583164413,
+      "final_std_pos": 38.79340025918856,
+      "final_std_vel": 0.08939005982630208,
+      "converged": true
+    },
+    {
+      "reward_sum": -58.756071761250496,
+      "length": 407,
+      "control_cost_sum": 18.056071761250188,
+      "final_std_pos": 36.67023882903242,
+      "final_std_vel": 0.09983934167453762,
+      "converged": true
+    },
+    {
+      "reward_sum": -61.90557112544775,
+      "length": 430,
+      "control_cost_sum": 18.905571125447377,
+      "final_std_pos": 38.39306356064955,
+      "final_std_vel": 0.09957167832441875,
+      "converged": true
+    },
+    {
+      "reward_sum": -106.11650548130274,
+      "length": 597,
+      "control_cost_sum": 46.4165054813021,
+      "final_std_pos": 39.95657115664678,
+      "final_std_vel": 0.09911918293505947,
+      "converged": true
+    },
+    {
+      "reward_sum": -69.45931068062782,
+      "length": 431,
+      "control_cost_sum": 26.359310680627438,
+      "final_std_pos": 38.29489295651287,
+      "final_std_vel": 0.09867067782698702,
+      "converged": true
+    },
+    {
+      "reward_sum": -59.64132987707853,
+      "length": 382,
+      "control_cost_sum": 21.441329877078225,
+      "final_std_pos": 38.11196832523104,
+      "final_std_vel": 0.09758961615086932,
+      "converged": true
+    },
+    {
+      "reward_sum": -45.92531077563763,
+      "length": 299,
+      "control_cost_sum": 16.025310775637692,
+      "final_std_pos": 38.48233698213535,
+      "final_std_vel": 0.09944656370629433,
+      "converged": true
+    },
+    {
+      "reward_sum": -163.96648970991373,
+      "length": 853,
+      "control_cost_sum": 78.66648970991542,
+      "final_std_pos": 39.82155345958961,
+      "final_std_vel": 0.09824714403270034,
+      "converged": true
+    },
+    {
+      "reward_sum": -151.45434181392193,
+      "length": 795,
+      "control_cost_sum": 71.95434181392326,
+      "final_std_pos": 41.28582385560598,
+      "final_std_vel": 0.0997173151692861,
+      "converged": true
+    },
+    {
+      "reward_sum": -153.24291818588972,
+      "length": 779,
+      "control_cost_sum": 75.34291818589091,
+      "final_std_pos": 38.52828817680237,
+      "final_std_vel": 0.09600940544922758,
+      "converged": true
+    },
+    {
+      "reward_sum": -173.06118919700384,
+      "length": 1000,
+      "control_cost_sum": 73.061189197006,
+      "final_std_pos": 40.21018194155293,
+      "final_std_vel": 0.20661840938708861,
+      "converged": false
+    },
+    {
+      "reward_sum": -228.60256259143353,
+      "length": 1000,
+      "control_cost_sum": 128.602562591436,
+      "final_std_pos": 42.41734101862554,
+      "final_std_vel": 10.536673174715242,
+      "converged": false
+    }
+  ]
+}
