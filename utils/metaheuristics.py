@@ -1,23 +1,12 @@
 import numpy as np
 import time
-from env.envs import LazyAgentsCentralized  # Import your custom environment
+from env.envs import LazyAgentsCentralized
 import copy
 import gym
 import ray
 
 
 class SLPSO:
-    # TODO (1): [Canceled] Could do better with the initialization
-    #   TODO (1-1) [Canceled] unify problem instances with the cost function e.g. cost_func returns configs as well
-    # TODO (2): [x] Think about validity of the seed generation method (current resoultion is 1ms)
-    # TODO (3): [o] Use both lower and upper bounds (update
-    # TODO (4): [Canceled] Set default bounds to infinities
-    # TODO (5): [o] Consider early termination
-    # TODO (6): [Canceled] Consider parallelization with multiple cost functions <- parallelize it in the outer scope
-    # TODO (7): [o] Create _cost_func as a method of the class (internal use of the cost function)
-    # TODO (8): [o] Validate the inputs
-    # TODO (9): [x] Create callbacks for customizations for particle initialization, early termination, etc.
-
     def __init__(self):
         self.require_reset = True
         self.cost_func = None
@@ -43,22 +32,16 @@ class SLPSO:
         :param low: (np.array) lower bound of the problem; shape: (d, )
         :param high: (np.array) upper bound of the problem; shape: (d, )
         :param M: (int) base population size
-        :param max_stagnation: (int) maximum stagnation counter (generations) before early termination (default: 100)
+        :param max_stagnation: (int) maximum stagnation counter before early termination
         """
         if self.require_reset:
-            # Check inputs
             self.cost_func = cost_func_
             low = -high if low is None else low
             self._check_inputs(d, low, high, M, max_stagnation)
-            # Set bounds
             self.lu = np.array([low, high], dtype=np.float32)
-            # Set dimension
             self.d = d
-            # Set base population size
             self.M = M if M is not None else 100
-            # Set stagnation counter
             self.stagnation_counter = 0
-            # Set maximum stagnation
             self.max_stagnation = max_stagnation
 
             self.require_reset = False
@@ -66,17 +49,13 @@ class SLPSO:
             raise Exception("Your problem is not ready for. Probably it's in the middle of the optimization process")
 
     def _check_inputs(self, d, low, high, M, max_stagnation):
-        # Check if cost_func is callable
         if self.cost_func is not None:
             assert callable(self.cost_func), "The cost function should be callable"
 
-        # Check if d is a positive integer
         assert isinstance(d, int) and d > 0, "The dimension of the problem should be a positive integer"
 
-        # Check if low and high are np.array
         assert isinstance(low, np.ndarray) and isinstance(high, np.ndarray), \
             "The lower and upper bounds should be np.array"
-        # Check if the bounds are valid
         assert low.shape == high.shape == (d, ), \
             "The shape of the lower and upper bounds should be (d, )" \
             "where d is the dimension of the problem"
@@ -85,10 +64,8 @@ class SLPSO:
         assert np.all(low <= high), \
             "The lower bound should be less than or equal to the upper bound"
 
-        # Check if M is a positive integer
         assert M > 0, "The base population size should be greater than 0"
 
-        # Check if max_stagnation is a positive integer
         assert max_stagnation > 0, "The maximum stagnation should be greater than 0"
 
     def run(self, see_time=False, see_updates=False, maxfe=None):
@@ -178,7 +155,6 @@ class SLPSO:
             num_fit_eval = num_fit_eval + m - 1  # best particle not evaluated
             gen += 1
 
-            # Print the results
             if see_updates:
                 print(f"\nGeneration: {gen}")
                 print(f"    Best cost: {best_cost_ever}")
@@ -189,24 +165,19 @@ class SLPSO:
 
         self.require_reset = True
 
-        # Reset the stagnation counter
         self.stagnation_counter = 0
 
         return best_p_ever, best_cost_ever
 
     def _cost_func(self, x):
-        # Check if the cost function is implemented
         if self.cost_func is not None:
             return self.cost_func(x)
-        else:  # not implemented error
+        else:
             raise NotImplementedError("The cost function is not implemented. "
                                       "Otherwise, you should pass the cost function to the constructor.")
 
     def _custom_particle_initializer(self, p):
-        """
-        :param p: particle matrix; shape: (m, d)
-        :return: p; updated initial particle matrix; shape: (m, d)
-        """
+        """Override to customize initial particle matrix p; shape: (m, d)."""
         raise NotImplementedError("The custom particle initializer is not implemented. "
                                   "Otherwise, you should pass the custom particle initializer to the constructor.")
 
@@ -221,70 +192,46 @@ class GetLazinessBySLPSO(SLPSO):
         self._do_custom__particle_initializer = True
         self.env_original = None
 
-        # # Initialize Ray
-        # ray.init(num_cpus=14, ignore_reinit_error=True)
-
     def set_env(self, env_initialized):
         """
         :param env_initialized: WARNING: it is assumed to maintain the number of agents in the environment in an episode
         """
-        # Check if env_initialized is a gym environment
         if not isinstance(env_initialized, gym.Env):
             raise TypeError("env_initialized should be a gym environment")
-        # Check if env_initialized is LazyAgentsCentralized class
         if not isinstance(env_initialized, LazyAgentsCentralized):
             raise TypeError("env_initialized should be LazyAgentsCentralized class")
         assert env_initialized.num_agents is not None, "num_agents should be initialized"
 
-        # Store the initialized environment and use it in the cost function by using deepcopy
         self.env_original = env_initialized
-        d = env_initialized.num_agents  # TODO: if you use num_agents, you should pad the laziness vector with 0s
-        # d = env_initialized.num_agents_max
+        d = env_initialized.num_agents
         low = np.zeros(d, dtype=np.float32)
         high = np.ones(d, dtype=np.float32)
         M = 100
-        max_stagnation = 20  # 20
+        max_stagnation = 20
 
-        # Reset the class with super's reset() method
         super().reset(cost_func_=None, d=d, low=low, high=high,  M=M, max_stagnation=max_stagnation)
 
     def run(self, see_updates=False, see_time=False, maxfe=None):
-        """
-        :param see_updates: if True, print the best cost and position in each generation
-        :param see_time: if True, print the time elapsed
-        :param maxfe: maximum number of fitness evaluations
-        :return: best laziness vector and best cost
-        """
+        """Returns (best_laziness_full, best_cost, best_laziness_small)."""
         best_laziness_small, best_cost = super().run(see_updates=see_updates, see_time=see_time, maxfe=maxfe)
 
-        # Extend the laziness vector to the maximum number of agents
         mask = self.env_original.is_padded == 0
-        # Fill the solution with 0s
         best_laziness_full = np.zeros(self.env_original.num_agents_max, dtype=np.float32)
-        # best_laziness_full: shape: (D, ); D: maximum number of agents == self.env_original.num_agents_max
         best_laziness_full[mask] = best_laziness_small
 
         return best_laziness_full, best_cost, best_laziness_small
 
     def _cost_func(self, p):
-        """
-        This function is used to evaluate the cost function from the gym environment
-        A cost of a particle is the sum of rewards of the gym environment episode with the particle as the constant action
-        :param p: m possible solutions (m laziness vectors ; shape: (m, d))
-        :return: m rewards; (shape: (m, ))
-        """
+        """Evaluate cost via gym episodes: cost = -reward_sum for each particle. p: (m, d) → (m,)."""
         m = p.shape[0]
-        # d = p.shape[1]
         cost_futures = []
 
-        # For each particle, evaluate the reward_sum in parallel using Ray
         for i in range(m):
             env = copy.deepcopy(self.env_original)
             p_in = p[i, :]
             cost_future = self.compute_single_particle_cost.remote(env=env, p=p_in)
             cost_futures.append(cost_future)
 
-        # Get the costs from the futures
         costs_got = ray.get(cost_futures)
 
         costs = np.array(costs_got, dtype=np.float32)  # shape: (m, )
@@ -297,7 +244,6 @@ class GetLazinessBySLPSO(SLPSO):
     @staticmethod
     @ray.remote
     def compute_single_particle_cost(env, p):
-        # TODO: You can use env.auto_step() to get the reward_sum without using the while loop
         assert env.use_custom_ray is True, "env.use_custom_ray should be True for parallel computing (immutable env)"
 
         reward_sum = 0
@@ -311,39 +257,26 @@ class GetLazinessBySLPSO(SLPSO):
         return cost
 
     def _custom_particle_initializer(self, p):
-        """
-        Replace a particle with an artificial particle representing fully active laziness vector in the initial pop
-        :param p: particle matrix; shape: (m, d)
-        :return: p; updated initial particle matrix; shape: (m, d)
-        """
-        # # Get the number of particles
-        # m = p.shape[0]
-        # Get the number of agents
+        """Injects a fully-active laziness vector (all ones) as the first particle."""
         d = p.shape[1]
-        # Get data type
         data_type_pop = p.dtype
 
-        # Create a fully active laziness vector
         laziness_full_active = np.ones(d, dtype=data_type_pop)
 
-        # Replace the first particle with the fully active laziness vector
         p[0, :] = laziness_full_active
 
         return p
 
 
 def cost_func(p):
-    # params: p: population; shape: (m, d)
-    # Sphere function
-    # You should use your implementation of the cost function and pass it to the SLPSO class
-    # Make sure if the return size is (m); must be a vector
-    return np.sum(p**2, axis=1)  # shape: (m, )
+    """Demo cost function (sphere). p: (m, d) → (m,)."""
+    return np.sum(p**2, axis=1)
 
 
 if __name__ == "__main__":
     # Problem configurations
     d = 30
-    lu = np.array([-100 * np.ones(d), 100 * np.ones(d)])
+    lu = np.array([-100 * np.ones(d), 100 * np.ones(d)], dtype=np.float32)
     M = 100
 
     pso = SLPSO()
