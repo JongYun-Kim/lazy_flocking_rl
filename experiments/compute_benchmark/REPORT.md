@@ -10,10 +10,13 @@ three action-selection policies used throughout this project, plus a
 | `Heuristic` | sole-lazy heuristic (`laziness = 1 - G·α·γ`) | `env.compute_heuristic_action()` |
 | `RL` | trained Transformer PPO via RLlib | `policy.compute_single_action(obs, explore=False)` — includes RLlib preprocessing, batch building, action-distribution sampling, and the `np.clip` at the end |
 | `RL_pure_forward` | trained Transformer PPO, NN only | `policy.model.policy_network(obs_td)` — obs pre-tensorised on the target device *outside* the timer, no RLlib wrapping |
+| `PSO` | PSO metaheuristic (SLPSO) | `PSOActionOptimizer.optimize(env)` — finds a single constant action for the entire episode via population-based search, parallelised with Ray (32 CPUs). Per-step time = total optimisation time ÷ episode steps |
 
 Only the action-selection call is timed. The subsequent `env.step(action)` is
 still executed (so the agents move and the observation distribution stays
-realistic), but its cost is not counted.
+realistic), but its cost is not counted. PSO is an exception: it internally
+runs full episodes to evaluate candidate actions, so its "action-selection"
+cost includes the environment simulation inside the optimiser.
 
 All code for this benchmark lives in `experiments/compute_benchmark/`. Nothing
 outside that directory was modified.
@@ -173,6 +176,19 @@ machine".
 | `Heuristic` | **29.41 μs** | 28.95 μs | 4.46 μs | 32.07 μs | 42.31 μs | 18.94 μs | 273.93 μs | 6000 |
 | `RL_pure_forward` (Transformer only) | **1 187.22 μs** ≈ 1.19 ms | 1 186.63 μs | 45.64 μs | 1 234.83 μs | 1 329.52 μs | 1 039.28 μs | 2 174.49 μs | 6000 |
 | `RL` (RLlib + Transformer) | **2 105.34 μs** ≈ 2.11 ms | 2 096.06 μs | 117.40 μs | 2 203.76 μs | 2 509.04 μs | 1 856.71 μs | 4 590.93 μs | 6000 |
+| `PSO` (SLPSO, 32 CPUs) | **420 192 μs** ≈ 420.2 ms | 413 455 μs | 165 377 μs | — | — | 258 286 μs | 588 835 μs | 3 † |
+
+† PSO finds one constant action per episode. `n = 3` is the number of
+independent optimisation runs; per-step time = total optimisation time ÷
+episode steps. High variance reflects episode-length variation (303–2000
+steps) and PSO convergence behaviour.
+
+**PSO total optimisation time (wall-clock):**
+
+| | mean | std | min | max |
+| --- | ---: | ---: | ---: | ---: |
+| Total time | **364.3 s** | 403.2 s | 87.6 s | 826.9 s |
+| Episode steps | **881** | — | 303 | 2000 |
 
 **Speed ratios (mean, CPU):**
 
@@ -183,10 +199,15 @@ machine".
 - `RL` / `Heuristic` ≈ **71.6×**
 - `RL` / `ACS` ≈ **384×**
 - `Heuristic` / `ACS` ≈ **5.4×**
+- `PSO` / `RL` ≈ **200×** (per-step equivalent; PSO uses 32 CPU cores vs
+  single-threaded for all other policies)
+- `PSO` / `Heuristic` ≈ **14 290×**
 
 At `dt = 0.1 s` the sim's real-time budget per step is 100 ms, so even the
 full RLlib path on CPU runs **~47.5× faster than real time**. The NN alone
-is **~84.2× faster than real time** on 4 CPU threads.
+is **~84.2× faster than real time** on 4 CPU threads. PSO's per-step
+equivalent of ~420 ms is **~4.2× slower than real time** despite using 32
+CPU cores — it cannot be used as an online policy.
 
 ## Results — GPU run
 
@@ -266,13 +287,23 @@ exactly as expected.
    barely shows up. Combined with the engineering cost (attention mask
    overflow, context-node upcast, numerics audit), fp16 is only worth the
    trouble if per-step μs really matter.
-5. **None of the policies is a real-time bottleneck in this env.**
+5. **PSO is offline-only.** At ~420 ms per step (amortised over the episode)
+   using 32 CPU cores, PSO is **~4.2× slower than real time** and **~200×
+   more expensive than the full RLlib RL path** (which itself uses one
+   thread). PSO's cost scales with the number of function evaluations
+   (population × generations × episode length), so it is fundamentally an
+   offline/batch optimiser — useful for finding benchmark-quality constant
+   actions, but not deployable as a real-time policy. The high variance
+   (std ≈ 165 ms around a 420 ms mean) reflects episode-length variation:
+   short converging episodes (303 steps) amortise the fixed optimisation
+   cost more favourably than long non-converging ones (2000 steps).
+6. **None of the reactive policies is a real-time bottleneck in this env.**
    `dt = 100 ms`, so even full-RLlib PPO on CPU runs ~47.5× faster than
    real time, and the graph-optimised NN runs **~380× faster than real
    time**. The concern isn't "does it fit in 100 ms", it's relative compute
    budget: a heuristic call is ~9–70× cheaper than any NN variant, which
    matters if you scale up agents, envs, or decision frequency.
-6. **Memory is a non-concern.** Model = **874,497 params / 3.34 MiB (fp32)**;
+7. **Memory is a non-concern.** Model = **874,497 params / 3.34 MiB (fp32)**;
    peak GPU memory at B=1 inference is **27.6 MiB**, and the captured graph
    adds only a small static-tensor footprint on top — still tens of MiB
    total. The `num_agents_max` shape cap is what actually constrains the
@@ -280,7 +311,7 @@ exactly as expected.
    captured graph valid for any N ≤ cap. If deployment memory ever got
    tight, fp16 / int8 quantisation would halve/quarter these numbers
    without changing the forward-pass structure.
-7. **Variance profile.** ACS is very tight (std ≈ 1.3 μs); Heuristic has a
+8. **Variance profile.** ACS is very tight (std ≈ 1.3 μs); Heuristic has a
    modest tail (p99 ≈ 42 μs). The graph variants are the tightest of all
    (std/mean ≈ 0.023 for `cudagraph_fp32`, ~0.020 for `cudagraph_fp16`):
    no dynamic scheduling, no Python-allocator noise, just a replay. The
@@ -293,10 +324,11 @@ exactly as expected.
 experiments/compute_benchmark/
 ├── REPORT.md                     (this file)
 ├── REPORT_ko.md                  (Korean version, regenerated from this file)
-├── benchmark.py                  (ACS / Heuristic / RL / RL_pure_forward timings + model_info)
+├── benchmark.py                  (ACS / Heuristic / RL / RL_pure_forward / PSO timings + model_info)
 ├── benchmark_cudagraph.py        (CUDA graph capture/replay variants, fp32 + fp16)
 └── results/
     ├── benchmark_cpu.json        (CPU timings + model_info)
     ├── benchmark_gpu.json        (GPU timings + model_info incl. peak GPU mem)
-    └── benchmark_cudagraph.json  (CUDA graph timings + numerics sanity checks)
+    ├── benchmark_cudagraph.json  (CUDA graph timings + numerics sanity checks)
+    └── benchmark_pso.json        (PSO optimisation timings, 32 CPUs)
 ```

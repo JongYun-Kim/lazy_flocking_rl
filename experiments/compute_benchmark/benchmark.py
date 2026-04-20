@@ -264,45 +264,132 @@ def time_policy(
     }
 
 
+def time_pso(
+    env_config: dict,
+    num_rollouts: int,
+    base_seed: int,
+    num_cpus: int,
+) -> Dict[str, object]:
+    """Run PSO optimization and measure wall-clock time.
+
+    PSO finds a single constant action per episode, so timing is
+    per-optimization. Per-step equivalent = optimization_time / episode_steps.
+    """
+    from env.envs import LazyAgentsCentralized
+    from utils.metaheuristics import PSOActionOptimizer
+
+    optimizer = PSOActionOptimizer(num_cpus=num_cpus)
+
+    optimization_times_s: List[float] = []
+    episode_steps_list: List[int] = []
+    per_step_times_us: List[float] = []
+    costs: List[float] = []
+
+    for i in range(num_rollouts):
+        env = LazyAgentsCentralized(env_config)
+        env.seed(base_seed + i)
+        env.reset()
+
+        optimal_action, cost, elapsed = optimizer.optimize(env)
+
+        done = False
+        steps = 0
+        while not done:
+            _, _, done, _ = env.step(optimal_action)
+            steps += 1
+
+        optimization_times_s.append(elapsed)
+        episode_steps_list.append(steps)
+        per_step_us = elapsed / steps * 1e6
+        per_step_times_us.append(per_step_us)
+        costs.append(float(cost))
+
+        print(
+            f"  rollout {i}: opt_time={elapsed:.1f}s  "
+            f"steps={steps}  per_step={per_step_us:.0f}us  cost={cost:.2f}"
+        )
+
+    optimizer.shutdown()
+
+    ps = np.array(per_step_times_us)
+    ot = np.array(optimization_times_s)
+    es = np.array(episode_steps_list, dtype=int)
+
+    return {
+        "num_samples": num_rollouts,
+        "mean_us": float(ps.mean()),
+        "std_us": float(ps.std(ddof=1)) if num_rollouts > 1 else 0.0,
+        "median_us": float(np.median(ps)),
+        "min_us": float(ps.min()),
+        "max_us": float(ps.max()),
+        "per_step_times_us": ps.tolist(),
+        "optimization_time_s": {
+            "mean": float(ot.mean()),
+            "std": float(ot.std(ddof=1)) if num_rollouts > 1 else 0.0,
+            "min": float(ot.min()),
+            "max": float(ot.max()),
+            "values": ot.tolist(),
+        },
+        "episode_steps": {
+            "mean": float(es.mean()),
+            "min": int(es.min()),
+            "max": int(es.max()),
+            "values": es.tolist(),
+        },
+        "costs": costs,
+        "num_cpus": num_cpus,
+    }
+
+
 def run_benchmark(args: argparse.Namespace) -> Dict[str, object]:
+    algos_to_run = args.algos if args.algos else ALGOS
+    needs_rl = any(a in algos_to_run for a in ["RL", "RL_pure_forward"])
+    needs_shared_env = any(
+        a in algos_to_run for a in ["ACS", "Heuristic", "RL", "RL_pure_forward"]
+    )
+
     # Control device visibility *before* torch/ray import chain spins up.
     if args.device == "cpu":
         os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
-    # Deferred imports so CUDA_VISIBLE_DEVICES applies.
-    import torch  # noqa: F401
-    from ray.rllib.models import ModelCatalog
-    from ray.rllib.policy.policy import Policy
-    from ray.tune.registry import register_env
-
-    # Torch's default on a big-core box (here: 36) oversubscribes a B=1 forward
-    # and the measurement gets dominated by thread-pool wakeup jitter. Pick an
-    # explicit, sensible count and record it.
-    if args.torch_threads is not None and args.torch_threads > 0:
-        torch.set_num_threads(args.torch_threads)
-        try:
-            torch.set_num_interop_threads(args.torch_threads)
-        except RuntimeError:
-            # set_num_interop_threads may only be called once per process;
-            # ignore if it was already set (e.g. in a REPL-like re-run).
-            pass
-
-    from env.envs import LazyAgentsCentralized
-    from models.lazy_allocator import MyRLlibTorchWrapper
-
-    ModelCatalog.register_custom_model("custom_model", MyRLlibTorchWrapper)
-    register_env("lazy_env", lambda cfg: LazyAgentsCentralized(cfg))
-
+    env = None
+    policy = None
+    model_info = {}
     env_config = build_env_config(args.num_agents, args.max_time_step)
-    env = LazyAgentsCentralized(env_config)
 
-    if not os.path.exists(args.checkpoint):
-        raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
-    print(f"Loading policy from {args.checkpoint}")
-    policy = Policy.from_checkpoint(args.checkpoint)
-    policy.model.eval()
-    force_policy_device(policy, args.device)
-    print(f"Policy device: {next(policy.model.parameters()).device}")
+    if needs_shared_env:
+        # Deferred imports so CUDA_VISIBLE_DEVICES applies.
+        import torch  # noqa: F401
+        from ray.rllib.models import ModelCatalog
+        from ray.tune.registry import register_env
+
+        # Torch's default on a big-core box (here: 36) oversubscribes a B=1
+        # forward and the measurement gets dominated by thread-pool wakeup
+        # jitter.  Pick an explicit, sensible count and record it.
+        if args.torch_threads is not None and args.torch_threads > 0:
+            torch.set_num_threads(args.torch_threads)
+            try:
+                torch.set_num_interop_threads(args.torch_threads)
+            except RuntimeError:
+                pass
+
+        from env.envs import LazyAgentsCentralized
+        from models.lazy_allocator import MyRLlibTorchWrapper
+
+        ModelCatalog.register_custom_model("custom_model", MyRLlibTorchWrapper)
+        register_env("lazy_env", lambda cfg: LazyAgentsCentralized(cfg))
+        env = LazyAgentsCentralized(env_config)
+
+    if needs_rl:
+        from ray.rllib.policy.policy import Policy
+
+        if not os.path.exists(args.checkpoint):
+            raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
+        print(f"Loading policy from {args.checkpoint}")
+        policy = Policy.from_checkpoint(args.checkpoint)
+        policy.model.eval()
+        force_policy_device(policy, args.device)
+        print(f"Policy device: {next(policy.model.parameters()).device}")
 
     # Environment info for provenance.
     host_info = {
@@ -310,60 +397,87 @@ def run_benchmark(args: argparse.Namespace) -> Dict[str, object]:
         "machine": platform.machine(),
         "processor": platform.processor(),
         "python": platform.python_version(),
-        "torch": __import__("torch").__version__,
-        "cuda_available": __import__("torch").cuda.is_available(),
-        "device": str(next(policy.model.parameters()).device),
         "num_cpus": os.cpu_count(),
-        "torch_num_threads": torch.get_num_threads(),
-        "torch_num_interop_threads": torch.get_num_interop_threads(),
     }
+    if needs_shared_env:
+        import torch
+        host_info.update({
+            "torch": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+            "torch_num_threads": torch.get_num_threads(),
+            "torch_num_interop_threads": torch.get_num_interop_threads(),
+        })
+    if policy is not None:
+        host_info["device"] = str(next(policy.model.parameters()).device)
     try:
         host_info["cpu_model"] = _read_first_cpu_model()
     except Exception:
         host_info["cpu_model"] = None
 
-    model_info = collect_model_info(policy, args.num_agents)
-    print(
-        f"Model: total={model_info['total_params']:,} params "
-        f"(policy_net={model_info['policy_network_params']:,}, "
-        f"value_branch={model_info['value_branch_params']:,}, "
-        f"value_network={model_info['value_network_params']:,})"
-    )
-    print(f"       state_dict ≈ {model_info['state_dict_mb']:.3f} MiB "
-          f"({model_info['dtype']})")
-    if "cuda_weights_mb" in model_info:
+    if needs_rl:
+        model_info = collect_model_info(policy, args.num_agents)
         print(
-            f"       GPU weights={model_info['cuda_weights_mb']:.3f} MiB, "
-            f"peak-inference={model_info['cuda_peak_inference_mb']:.3f} MiB"
+            f"Model: total={model_info['total_params']:,} params "
+            f"(policy_net={model_info['policy_network_params']:,}, "
+            f"value_branch={model_info['value_branch_params']:,}, "
+            f"value_network={model_info['value_network_params']:,})"
         )
+        print(f"       state_dict ≈ {model_info['state_dict_mb']:.3f} MiB "
+              f"({model_info['dtype']})")
+        if "cuda_weights_mb" in model_info:
+            print(
+                f"       GPU weights={model_info['cuda_weights_mb']:.3f} MiB, "
+                f"peak-inference={model_info['cuda_peak_inference_mb']:.3f} MiB"
+            )
 
     results: Dict[str, object] = {}
-    algos_to_run = args.algos if args.algos else ALGOS
     for algo in algos_to_run:
-        print(
-            f"\n[{algo}] warmup={args.warmup_steps}  "
-            f"rollouts={args.num_rollouts} x steps={args.steps_per_rollout} "
-            f"(n={args.num_rollouts*args.steps_per_rollout})"
-        )
-        t_start = time.time()
-        summary = time_policy(
-            algo=algo,
-            env=env,
-            policy=policy,
-            num_rollouts=args.num_rollouts,
-            steps_per_rollout=args.steps_per_rollout,
-            warmup_steps=args.warmup_steps,
-            base_seed=args.base_seed,
-            device=args.device,
-        )
-        wall_s = time.time() - t_start
-        summary["wall_clock_s"] = wall_s
-        results[algo] = summary
-        print(
-            f"  mean={summary['mean_us']:.2f}us  median={summary['median_us']:.2f}us  "
-            f"p95={summary['p95_us']:.2f}us  p99={summary['p99_us']:.2f}us  "
-            f"std={summary['std_us']:.2f}us  n={summary['num_samples']}"
-        )
+        if algo == "PSO":
+            print(
+                f"\n[PSO] rollouts={args.num_rollouts}  num_cpus={args.num_cpus}"
+            )
+            t_start = time.time()
+            summary = time_pso(
+                env_config=env_config,
+                num_rollouts=args.num_rollouts,
+                base_seed=args.base_seed,
+                num_cpus=args.num_cpus,
+            )
+            wall_s = time.time() - t_start
+            summary["wall_clock_s"] = wall_s
+            results[algo] = summary
+            opt_t = summary["optimization_time_s"]
+            ep_s = summary["episode_steps"]
+            print(
+                f"  per_step: mean={summary['mean_us']:.0f}us  "
+                f"opt_time: mean={opt_t['mean']:.1f}s  "
+                f"steps: mean={ep_s['mean']:.0f}"
+            )
+        else:
+            print(
+                f"\n[{algo}] warmup={args.warmup_steps}  "
+                f"rollouts={args.num_rollouts} x steps={args.steps_per_rollout} "
+                f"(n={args.num_rollouts*args.steps_per_rollout})"
+            )
+            t_start = time.time()
+            summary = time_policy(
+                algo=algo,
+                env=env,
+                policy=policy,
+                num_rollouts=args.num_rollouts,
+                steps_per_rollout=args.steps_per_rollout,
+                warmup_steps=args.warmup_steps,
+                base_seed=args.base_seed,
+                device=args.device,
+            )
+            wall_s = time.time() - t_start
+            summary["wall_clock_s"] = wall_s
+            results[algo] = summary
+            print(
+                f"  mean={summary['mean_us']:.2f}us  median={summary['median_us']:.2f}us  "
+                f"p95={summary['p95_us']:.2f}us  p99={summary['p99_us']:.2f}us  "
+                f"std={summary['std_us']:.2f}us  n={summary['num_samples']}"
+            )
 
     return {
         "args": vars(args),
@@ -487,7 +601,14 @@ def main():
         "--algos",
         nargs="*",
         default=None,
-        help="subset of algorithms to benchmark (default: all three)",
+        help="subset of algorithms to benchmark; PSO is opt-in "
+        "(default: ACS Heuristic RL RL_pure_forward)",
+    )
+    parser.add_argument(
+        "--num_cpus",
+        type=int,
+        default=None,
+        help="number of CPUs for Ray (PSO parallelisation); None = auto-detect",
     )
     parser.add_argument(
         "--output",

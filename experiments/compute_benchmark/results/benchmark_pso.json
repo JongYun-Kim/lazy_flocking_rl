@@ -1,0 +1,94 @@
+{
+  "args": {
+    "num_agents": 20,
+    "max_time_step": 2000,
+    "num_rollouts": 3,
+    "steps_per_rollout": 2000,
+    "warmup_steps": 200,
+    "base_seed": 4242,
+    "checkpoint": "/workspace/bk/bk_082623/PPO_lazy_env_36f5d_00000_0_use_deterministic_action_dist=True_2023-08-26_12-53-47/checkpoint_000074/policies/default_policy",
+    "device": "cpu",
+    "torch_threads": 4,
+    "algos": [
+      "PSO"
+    ],
+    "num_cpus": 32,
+    "output": "experiments/compute_benchmark/results/benchmark_pso.json"
+  },
+  "env_config": {
+    "num_agents_max": 20,
+    "num_agents_min": 20,
+    "speed": 15,
+    "max_turn_rate": 0.5333333333333333,
+    "inter_agent_strength": 5,
+    "communication_decay_rate": 0.3333333333333333,
+    "bonding_strength": 1,
+    "initial_position_bound": 250,
+    "predefined_distance": 60,
+    "std_pos_converged": 45,
+    "std_vel_converged": 0.1,
+    "std_pos_rate_converged": 0.1,
+    "std_vel_rate_converged": 0.2,
+    "max_time_step": 2000,
+    "incomplete_episode_penalty": 0,
+    "normalize_obs": true,
+    "use_fixed_horizon": false,
+    "use_L2_norm": false,
+    "use_heuristics": true,
+    "_use_fixed_lazy_idx": true,
+    "use_preprocessed_obs": true,
+    "get_state_hist": false
+  },
+  "host_info": {
+    "hostname": "85fea6384160",
+    "machine": "x86_64",
+    "processor": "x86_64",
+    "python": "3.9.5",
+    "num_cpus": 72,
+    "cpu_model": "Intel(R) Xeon(R) w9-3475X"
+  },
+  "model_info": {},
+  "algorithms": {
+    "PSO": {
+      "num_samples": 3,
+      "mean_us": 420191.86650297657,
+      "std_us": 165377.47298770142,
+      "median_us": 413455.02614974976,
+      "min_us": 258285.75806631803,
+      "max_us": 588834.815292862,
+      "per_step_times_us": [
+        258285.75806631803,
+        413455.02614974976,
+        588834.815292862
+      ],
+      "optimization_time_s": {
+        "mean": 364.2952911059062,
+        "std": 403.2035596282927,
+        "min": 87.55887198448181,
+        "max": 826.9100522994995,
+        "values": [
+          87.55887198448181,
+          826.9100522994995,
+          178.41694903373718
+        ]
+      },
+      "episode_steps": {
+        "mean": 880.6666666666666,
+        "min": 303,
+        "max": 2000,
+        "values": [
+          339,
+          2000,
+          303
+        ]
+      },
+      "costs": [
+        111.2669677734375,
+        252.82383728027344,
+        98.7444839477539
+      ],
+      "num_cpus": 32,
+      "wall_clock_s": 1099.6794867515564
+    }
+  }
+}

@@ -268,6 +268,61 @@ class GetLazinessBySLPSO(SLPSO):
         return p
 
 
+class PSOActionOptimizer:
+    """Finds the optimal constant action for a LazyAgentsCentralized env using PSO + Ray."""
+
+    def __init__(self, num_cpus=None):
+        self.num_cpus = num_cpus
+        self._ray_initialized_here = False
+
+    def optimize(self, env, maxfe=None, see_updates=False, see_time=False):
+        """
+        :param env: LazyAgentsCentralized instance, already reset()
+        :param maxfe: max function evaluations (default: d*5000 inside SLPSO)
+        :return: (optimal_action, cost, elapsed_time)
+                 optimal_action shape: (num_agents_max,), padded agents are 0
+                 cost: negative episode reward (lower is better)
+                 elapsed_time: wall-clock seconds for the PSO optimization
+        """
+        if not isinstance(env, LazyAgentsCentralized):
+            raise TypeError("env must be a LazyAgentsCentralized instance")
+        if env.num_agents is None:
+            raise ValueError("env must be reset before optimization")
+
+        self._ensure_ray()
+
+        env_for_pso = copy.deepcopy(env)
+        env_for_pso.use_custom_ray = True
+
+        pso = GetLazinessBySLPSO()
+        pso.set_env(env_for_pso)
+
+        t_start = time.time()
+        optimal_action, cost, _ = pso.run(
+            see_updates=see_updates, see_time=see_time, maxfe=maxfe
+        )
+        elapsed_time = time.time() - t_start
+
+        return optimal_action, cost, elapsed_time
+
+    def _ensure_ray(self):
+        if not ray.is_initialized():
+            ray.init(num_cpus=self.num_cpus)
+            self._ray_initialized_here = True
+
+    def shutdown(self):
+        if self._ray_initialized_here and ray.is_initialized():
+            ray.shutdown()
+            self._ray_initialized_here = False
+
+    def __enter__(self):
+        self._ensure_ray()
+        return self
+
+    def __exit__(self, *args):
+        self.shutdown()
+
+
 def cost_func(p):
     """Demo cost function (sphere). p: (m, d) → (m,)."""
     return np.sum(p**2, axis=1)
