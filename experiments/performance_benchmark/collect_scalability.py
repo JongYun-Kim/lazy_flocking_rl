@@ -3,11 +3,19 @@
 Usage:
     python -m experiments.performance_benchmark.collect_scalability --method acs
     python -m experiments.performance_benchmark.collect_scalability --method heuristic
-    python -m experiments.performance_benchmark.collect_scalability --method rl --checkpoint <path>
+    python -m experiments.performance_benchmark.collect_scalability --method rl
+    python -m experiments.performance_benchmark.collect_scalability --method rl --device cuda
     python -m experiments.performance_benchmark.collect_scalability --method pso
 
 Run each method sequentially (Ray resources overlap).
 Results are saved per UAV count under results/scalability/.
+
+RL notes:
+    The trained checkpoint (num_agents_max=20) is used directly via the raw
+    policy_network (LazinessAllocator), bypassing RLlib's fixed-size
+    observation/action spaces. The transformer handles arbitrary sequence
+    lengths natively. Pass --device cuda for GPU inference (recommended for
+    n >= 64 based on profiling).
 """
 
 import argparse
@@ -25,7 +33,7 @@ if WORKSPACE not in sys.path:
     sys.path.insert(0, WORKSPACE)
 
 from experiments.performance_benchmark.config import (
-    CHECKPOINT_PATH, PSO_SKIP_AGENTS, SCALABILITY_AGENTS, SEEDS,
+    CHECKPOINT_PATH, PSO_SKIP_AGENTS, SCALABILITY_AGENTS, SCALABILITY_SEEDS,
     WORKSPACE as WS, build_env_config, episode_metrics, save_results,
 )
 
@@ -85,16 +93,20 @@ def _run_heuristic_ep(seed, env_config, workspace):
 
 
 # ---------------------------------------------------------------------------
-# RL — Ray actor (loads checkpoint once per worker)
+# RL — Ray actor using raw policy_network (works for any num_agents)
 # ---------------------------------------------------------------------------
 
 @ray.remote
 class _RLWorker:
-    def __init__(self, checkpoint_path, workspace):
+    """Runs the raw LazinessAllocator, bypassing RLlib's fixed-size spaces."""
+
+    def __init__(self, checkpoint_path, device, workspace):
         import sys
         if workspace not in sys.path:
             sys.path.insert(0, workspace)
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+        import torch
         from ray.rllib.models import ModelCatalog
         from ray.rllib.policy.policy import Policy
         from ray.tune.registry import register_env
@@ -103,10 +115,15 @@ class _RLWorker:
 
         ModelCatalog.register_custom_model("custom_model", MyRLlibTorchWrapper)
         register_env("lazy_env", lambda cfg: LazyAgentsCentralized(cfg))
-        self.policy = Policy.from_checkpoint(checkpoint_path)
-        self.policy.model.eval()
+
+        policy = Policy.from_checkpoint(checkpoint_path)
+        policy.model.eval()
+        self.net = policy.model.policy_network
+        self.device = torch.device(device)
+        self.net.to(self.device)
 
     def run_episode(self, seed, env_config):
+        import torch
         import numpy as np
         from env.envs import LazyAgentsCentralized
         from experiments.performance_benchmark.config import episode_metrics
@@ -114,11 +131,21 @@ class _RLWorker:
         env = LazyAgentsCentralized(env_config)
         env.seed(seed)
         obs = env.reset()
+        n = env_config["num_agents_max"]
 
         done, r1, r2 = False, 0.0, 0.0
         while not done:
-            action = self.policy.compute_single_action(obs, explore=False)[0]
-            action = np.clip(action, 0.0, 1.0)
+            ae = torch.as_tensor(
+                obs["agent_embeddings"], dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
+            pt = torch.as_tensor(
+                obs["pad_tokens"], dtype=torch.int32, device=self.device
+            ).unsqueeze(0)
+            with torch.no_grad():
+                out, _, _ = self.net({"agent_embeddings": ae, "pad_tokens": pt})
+            half = out.shape[-1] // 2
+            action = out[0, :half].clamp(0.0, 1.0).cpu().numpy()
+
             obs, _, done, info = env.step(action)
             r = info["original_rewards"]
             r1 += r[0]; r2 += r[1]
@@ -142,8 +169,12 @@ def collect_heuristic(env_config, seeds):
     return ray.get(futures)
 
 
-def collect_rl(env_config, seeds, checkpoint, num_workers):
-    workers = [_RLWorker.remote(checkpoint, WS) for _ in range(num_workers)]
+def collect_rl(env_config, seeds, checkpoint, device, num_workers):
+    gpu_per_worker = 0.25 if device == "cuda" else 0
+    workers = [
+        _RLWorker.options(num_gpus=gpu_per_worker).remote(checkpoint, device, WS)
+        for _ in range(num_workers)
+    ]
     futures = []
     for i, seed in enumerate(seeds):
         futures.append(workers[i % num_workers].run_episode.remote(seed, env_config))
@@ -152,20 +183,36 @@ def collect_rl(env_config, seeds, checkpoint, num_workers):
     return results
 
 
-def collect_pso(env_config, seeds, num_cpus, maxfe):
+def collect_pso(env_config, seeds, num_cpus, maxfe, partial_dir):
     from env.envs import LazyAgentsCentralized
     from utils.metaheuristics import PSOActionOptimizer
 
-    optimizer = PSOActionOptimizer(num_cpus=num_cpus)
+    n = env_config["num_agents_max"]
+    partial_path = os.path.join(partial_dir, f"pso_n{n}_partial.json")
+
+    # Resume support
     results = []
+    done_seeds = set()
+    if os.path.exists(partial_path):
+        with open(partial_path) as f:
+            results = json.load(f)["results"]
+        done_seeds = {r["seed"] for r in results}
+        if done_seeds:
+            print(f"    resuming: {len(done_seeds)} already done")
+
+    optimizer = PSOActionOptimizer(num_cpus=num_cpus)
     for i, seed in enumerate(seeds):
+        if seed in done_seeds:
+            continue
+
         env = LazyAgentsCentralized(env_config)
         env.seed(seed)
         env.reset()
 
         optimal_action, cost, elapsed = optimizer.optimize(env, maxfe=maxfe)
 
-        done, r1, r2 = False, 0.0, 0.0
+        done = False
+        r1, r2 = 0.0, 0.0
         while not done:
             _, _, done, info = env.step(optimal_action)
             r = info["original_rewards"]
@@ -177,9 +224,16 @@ def collect_pso(env_config, seeds, num_cpus, maxfe):
         m["pso_cost"] = float(cost)
         results.append(m)
 
-        print(f"    [{i+1}/{len(seeds)}] seed={seed}  "
+        print(f"    [{len(results)}/{len(seeds)}] seed={seed}  "
               f"opt={elapsed:.0f}s  steps={m['episode_length']}  "
               f"rL1={m['reward_L1']:.1f}")
+
+        with open(partial_path, "w") as f:
+            json.dump({"results": results}, f, indent=2)
+
+    # Clean up partial
+    if os.path.exists(partial_path):
+        os.remove(partial_path)
     return results
 
 
@@ -194,15 +248,18 @@ def main():
     parser.add_argument("--num_cpus", type=int, default=64)
     parser.add_argument("--agents", type=int, nargs="*", default=None,
                         help="UAV counts to evaluate (default: all scalability counts)")
-    parser.add_argument("--checkpoint", type=str, default=CHECKPOINT_PATH,
-                        help="RL checkpoint path")
+    parser.add_argument("--checkpoint", type=str, default=CHECKPOINT_PATH)
+    parser.add_argument("--device", type=str, default="cpu",
+                        choices=["cpu", "cuda"],
+                        help="RL inference device (cuda recommended for n>=64)")
     parser.add_argument("--num_workers", type=int, default=16,
                         help="number of Ray actors for RL")
     parser.add_argument("--maxfe", type=int, default=None,
-                        help="PSO max function evaluations")
+                        help="PSO max function evaluations (default: d*5000)")
     args = parser.parse_args()
 
     agent_counts = args.agents if args.agents else SCALABILITY_AGENTS
+    seeds = SCALABILITY_SEEDS
 
     ray.init(num_cpus=args.num_cpus)
     t_total = time.time()
@@ -220,19 +277,22 @@ def main():
         if args.method == "pso":
             env_config["use_L2_norm"] = True
 
-        print(f"\n[{args.method.upper()} n={n}] collecting {len(SEEDS)} episodes ...")
+        print(f"\n[{args.method.upper()} n={n}] {len(seeds)} episodes ...")
         t0 = time.time()
 
         if args.method == "acs":
-            results = collect_acs(env_config, SEEDS)
+            results = collect_acs(env_config, seeds)
         elif args.method == "heuristic":
-            results = collect_heuristic(env_config, SEEDS)
+            results = collect_heuristic(env_config, seeds)
         elif args.method == "rl":
-            results = collect_rl(env_config, SEEDS, args.checkpoint,
-                                 args.num_workers)
+            results = collect_rl(env_config, seeds, args.checkpoint,
+                                 args.device, args.num_workers)
         elif args.method == "pso":
-            results = collect_pso(env_config, SEEDS, args.num_cpus,
-                                  args.maxfe)
+            from experiments.performance_benchmark.config import RESULTS_DIR
+            partial_dir = os.path.join(RESULTS_DIR, "scalability")
+            os.makedirs(partial_dir, exist_ok=True)
+            results = collect_pso(env_config, seeds, args.num_cpus,
+                                  args.maxfe, partial_dir)
 
         elapsed = time.time() - t0
         tag = f"{args.method}_n{n}"
