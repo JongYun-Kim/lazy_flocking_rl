@@ -207,6 +207,16 @@ class LazyAgentsCentralized(gym.Env):
         self.num_agent_min = None
         self.num_agent_max = None
 
+        # Skip observation computation (for PSO where obs is discarded)
+        self._skip_obs = False
+
+        # Cached topology arrays (set in _cache_topology, called from reset)
+        self._cache_neighbors = None
+        self._cache_neighbor_counts = None
+        self._cache_eye_eps = None
+        self._cache_lambda_over_nc = None
+        self._cache_sig_nv = None
+
         # For plotting
         self.state_hist = None
         # self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
@@ -238,6 +248,7 @@ class LazyAgentsCentralized(gym.Env):
         # Initialize network topology
         self.net_topology_full = np.zeros((self.num_agents_max, self.num_agents_max), dtype=np.int32)
         self.update_topology_from_padding(init=True)
+        self._cache_topology()
 
         # Initialize agent states
         # (1) position: shape (num_agents_max, 2)
@@ -457,6 +468,7 @@ class LazyAgentsCentralized(gym.Env):
         # Update network topology
         if np.sum(gain_mask) + np.sum(loss_mask) > 0:  # if there is any change
             self.update_topology_from_padding()
+            self._cache_topology()
 
     def update_padding_from_agent_changes(self, changes_in_agents):
         # This function updates the padding from the changes in agents
@@ -567,6 +579,15 @@ class LazyAgentsCentralized(gym.Env):
 
         return adj_mat  # a copy of the adjacency matrix; not linked to the original object (i.e. self.adjacency_matrix)
 
+    def _cache_topology(self, mask=None):
+        mask = self.is_padded == 0 if mask is None else mask
+        neighbors = self.net_topology_full[mask, :][:, mask]
+        self._cache_neighbors = neighbors.astype(np.float64)                     # (num_agents, num_agents)
+        self._cache_neighbor_counts = neighbors.sum(axis=1).astype(np.float64)   # (num_agents,)
+        self._cache_eye_eps = np.eye(self.num_agents) * np.finfo(float).eps      # (num_agents, num_agents)
+        self._cache_lambda_over_nc = self.lambda_ / self._cache_neighbor_counts  # (num_agents,)
+        self._cache_sig_nv = self.sigma / (self.v * self._cache_neighbor_counts) # (num_agents,)
+
     def step(self,
              action: np.ndarray,
              ):
@@ -652,7 +673,8 @@ class LazyAgentsCentralized(gym.Env):
         # Get observation
         # self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max), mask=mask)  # next_fully_active_control
         self.u_fully_active, self.u_fully_active_decomposed = self.get_u(mask=mask, get_decomposed_u=True)
-        obs = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)  # next_observation
+        obs = None if self._skip_obs else \
+            self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)  # next_observation
 
         # Get state history: get it before updating the time step (overriding the initial state from the reset method)
         if self.get_state_hist:
@@ -869,50 +891,38 @@ class LazyAgentsCentralized(gym.Env):
         assert mask.dtype == np.bool  # np.bool_ depending on your ray (or numpy) version
         assert np.sum(mask) == self.num_agents  # TODO: remove the asserts once the code is stable
 
-        # Get variables (local infos)
-        # rel_pos ((x_j-x_i), (y_j-y_i)): relative position; shape: (num_agents, num_agents, 2)
-        # rel_dist (r_ij): relative distance; all positive (0 inc); shape: (num_agents, num_agents)
-        rel_pos, rel_dist = self.get_relative_info(self.agent_pos, get_dist=True, mask=mask, get_local=True)
-        # rel_ang (θ_j - θ_i): relative angle; shape: (num_agents, num_agents): 2D (i.e. dist info)
-        _, rel_ang = self.get_relative_info(self.agent_ang, get_dist=True, mask=mask, get_local=True)
-        # rel_vel ((vx_j-vx_i), (vy_j-vy_i)): relative velocity; shape: (num_agents, num_agents, 2)
-        rel_vel, _ = self.get_relative_info(self.agent_vel, get_dist=False, mask=mask, get_local=True)
+        # Relative quantities via single broadcast (replaces 3 get_relative_info calls)
+        pos = self.agent_pos[mask]   # (num_agents, 2)
+        ang = self.agent_ang[mask]   # (num_agents, 1)
+        vel = self.agent_vel[mask]   # (num_agents, 2)
+        rel_pos = pos[np.newaxis, :, :] - pos[:, np.newaxis, :]    # (num_agents, num_agents, 2)
+        rel_ang = ang.ravel()[np.newaxis, :] - ang.ravel()[:, np.newaxis]  # (num_agents, num_agents)
+        rel_vel = vel[np.newaxis, :, :] - vel[:, np.newaxis, :]    # (num_agents, num_agents, 2)
+        rel_dist = np.sqrt(rel_pos[:, :, 0]**2 + rel_pos[:, :, 1]**2)     # (num_agents, num_agents)
 
-        # 1. Compute alignment control input
-        # u_cs = (lambda/n(N_i)) * sum_{j in N_i}[ psi(r_ij)sin(θ_j - θ_i) ],
-        # where N_i is the set of neighbors of agent i,
-        # psi(r_ij) = 1/(1+r_ij^2)^(beta),
-        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
-        psi = (1 + rel_dist ** 2) ** (-self.beta)  # shape: (num_agents, num_agents)
-        alignment_error = np.sin(rel_ang)  # shape: (num_agents, num_agents)
-        Neighbors = self.view_adjacency_matrix(mask=mask)  # shape: (num_agents, num_agents); from full network topology
-        # u_cs: shape: (num_agents,)
-        u_cs = (self.lambda_ / Neighbors.sum(axis=1)) * (Neighbors * psi * alignment_error).sum(axis=1)
+        # Use cached topology arrays (set in reset / update_topology_from_padding)
+        Neighbors = self._cache_neighbors
+        lambda_over_nc = self._cache_lambda_over_nc
+        sig_NV = self._cache_sig_nv
+        eye_eps = self._cache_eye_eps
 
-        # 2. Compute cohesion control input
-        # u_coh[i] = (sigma/N*V)
-        #            * sum_(j in N_i)
-        #               [
-        #                   {
-        #                       (K1/(2*r_ij^2))*<-rel_vel, -rel_pos> + (K2/(2*r_ij^2))*(r_ij-R)
-        #                   }
-        #                   * <[-sin(θ_i), cos(θ_i)]^T, rel_pos>
-        #               ]
-        # where N_i is the set of neighbors of agent i,
-        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
-        # rel_vel = (vx_j - vx_i, vy_j - vy_i),
-        # rel_pos = (x_j - x_i, y_j - y_i),
-        sig_NV = self.sigma / (self.v * Neighbors.sum(axis=1))  # shape: (num_agents,)
-        r_ij = rel_dist + (np.eye(self.num_agents) * np.finfo(float).eps)  # shape: (num_agents, num_agents)
-        k1_2rij2 = self.k1 / (2 * r_ij ** 2)  # shape: (num_agents, num_agents)
-        k2_2rij = self.k2 / (2 * r_ij)  # shape: (num_agents, num_agents)
-        v_dot_p = np.einsum('ijk,ijk->ij', rel_vel, rel_pos)  # shape: (num_agents, num_agents)
-        rij_R = rel_dist - self.R  # shape: (num_agents, num_agents)
-        ang_vec = np.concatenate([-np.sin(self.agent_ang[mask]), np.cos(self.agent_ang[mask])], axis=1)  # (num_a, 2)
-        ang_vec = np.tile(ang_vec[:, np.newaxis, :], (1, self.num_agents, 1))  # (num_agents, num_agents, 2)
-        ang_dot_p = np.einsum('ijk,ijk->ij', ang_vec, rel_pos)  # shape: (num_agents, num_agents)
-        need_sum = (k1_2rij2 * v_dot_p + k2_2rij * rij_R) * ang_dot_p  # shape: (num_agents, num_agents)
-        u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # shape: (num_agents,)
+        # 1. Alignment: u_cs = (λ/|N_i|) * Σ_j∈N_i [ψ(r_ij) sin(θ_j - θ_i)]
+        psi = (1 + rel_dist ** 2) ** (-self.beta)  # (n, n)
+        u_cs = lambda_over_nc * (Neighbors * psi * np.sin(rel_ang)).sum(axis=1)  # (n,)
+
+        # 2. Cohesion: u_coh
+        r_ij = rel_dist + eye_eps  # (n, n)
+        k1_2rij2 = self.k1 / (2 * r_ij ** 2)  # (n, n)
+        k2_2rij = self.k2 / (2 * r_ij)  # (n, n)
+        v_dot_p = np.einsum('ijk,ijk->ij', rel_vel, rel_pos)  # (n, n)
+        rij_R = rel_dist - self.R  # (n, n)
+        ang_flat = ang.ravel()
+        ang_vec = np.empty((self.num_agents, 2))
+        ang_vec[:, 0] = -np.sin(ang_flat)
+        ang_vec[:, 1] = np.cos(ang_flat)
+        ang_dot_p = np.einsum('ik,ijk->ij', ang_vec, rel_pos)  # (num_agents, num_agents) — no tile
+        need_sum = (k1_2rij2 * v_dot_p + k2_2rij * rij_R) * ang_dot_p  # (num_agents, num_agents)
+        u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # (num_agents,)
 
         # 3. Compute separation control input
         # TODO: implement separation control input when it is needed; for now, no separation control input

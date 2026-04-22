@@ -293,6 +293,7 @@ class PSOActionOptimizer:
 
         env_for_pso = copy.deepcopy(env)
         env_for_pso.use_custom_ray = True
+        env_for_pso._skip_obs = True
 
         pso = GetLazinessBySLPSO()
         pso.set_env(env_for_pso)
