@@ -170,7 +170,12 @@ def collect_heuristic(env_config, seeds):
 
 
 def collect_rl(env_config, seeds, checkpoint, device, num_workers):
-    gpu_per_worker = 0.25 if device == "cuda" else 0
+    if device == "cuda":
+        import torch
+        num_gpus = torch.cuda.device_count()
+        gpu_per_worker = num_gpus / num_workers
+    else:
+        gpu_per_worker = 0
     workers = [
         _RLWorker.options(num_gpus=gpu_per_worker).remote(checkpoint, device, WS)
         for _ in range(num_workers)
@@ -252,8 +257,8 @@ def main():
     parser.add_argument("--device", type=str, default="cpu",
                         choices=["cpu", "cuda"],
                         help="RL inference device (cuda recommended for n>=64)")
-    parser.add_argument("--num_workers", type=int, default=16,
-                        help="number of Ray actors for RL")
+    parser.add_argument("--num_workers", type=int, default=64,
+                        help="number of Ray actors for RL (default matches --num_cpus)")
     parser.add_argument("--maxfe", type=int, default=None,
                         help="PSO max function evaluations (default: d*5000)")
     args = parser.parse_args()
