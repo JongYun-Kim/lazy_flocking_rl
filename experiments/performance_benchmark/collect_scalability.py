@@ -261,10 +261,12 @@ def main():
                         help="number of Ray actors for RL (default matches --num_cpus)")
     parser.add_argument("--maxfe", type=int, default=None,
                         help="PSO max function evaluations (default: d*5000)")
+    parser.add_argument("--num_episodes", type=int, default=None,
+                        help="limit episodes per scale (default: all seeds)")
     args = parser.parse_args()
 
     agent_counts = args.agents if args.agents else SCALABILITY_AGENTS
-    seeds = SCALABILITY_SEEDS
+    seeds = SCALABILITY_SEEDS[:args.num_episodes] if args.num_episodes else SCALABILITY_SEEDS
 
     ray.init(num_cpus=args.num_cpus)
     t_total = time.time()
