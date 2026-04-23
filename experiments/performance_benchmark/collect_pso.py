@@ -30,6 +30,10 @@ def main():
                         help="max function evaluations per PSO run (default: d*5000)")
     parser.add_argument("--resume", action="store_true",
                         help="skip seeds already present in the partial file")
+    parser.add_argument("--seed_pso", action="store_true",
+                        help="propagate per-episode seed into PSO's internal RNG "
+                             "(deterministic PSO). Default: off — preserves legacy "
+                             "non-deterministic PSO runs for compatibility.")
     args = parser.parse_args()
 
     ray.init(num_cpus=args.num_cpus)
@@ -59,6 +63,7 @@ def main():
 
         optimal_action, cost, elapsed = optimizer.optimize(
             env, maxfe=args.maxfe,
+            seed=seed if args.seed_pso else None,
         )
 
         done = False

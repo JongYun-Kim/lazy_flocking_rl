@@ -68,7 +68,14 @@ class SLPSO:
 
         assert max_stagnation > 0, "The maximum stagnation should be greater than 0"
 
-    def run(self, see_time=False, see_updates=False, maxfe=None):
+    def run(self, see_time=False, see_updates=False, maxfe=None, seed=None):
+        """
+        :param seed: if not None, the PSO RNG is deterministically seeded with this
+                     value (via np.random.default_rng) for the entire run. If None
+                     (default), the legacy behavior is preserved: the global numpy
+                     RNG is reseeded with the current wall-clock time before each
+                     random draw, which is non-deterministic across runs.
+        """
         if self.require_reset:
             raise Exception("You must reset the problem before running the optimization process")
 
@@ -80,6 +87,17 @@ class SLPSO:
             print("maxfe is NOW set to d*5000")
             maxfe = self.d*5000
 
+        rng = np.random.default_rng(seed) if seed is not None else None
+
+        def _reseed():
+            if rng is None:
+                np.random.seed(int(time.time()*1000) % (2**32))
+
+        def _rand(*shape):
+            if rng is not None:
+                return rng.random(shape)
+            return np.random.rand(*shape)
+
         m = self.M + self.d // 10
         c3 = self.d / self.M * 0.01
         PL = np.zeros((m, 1))
@@ -89,8 +107,8 @@ class SLPSO:
 
         XRRmin = np.tile(self.lu[0, :], (m, 1))
         XRRmax = np.tile(self.lu[1, :], (m, 1))
-        np.random.seed(int(time.time()*1000) % (2**32))
-        p = XRRmin + (XRRmax - XRRmin) * np.random.rand(m, self.d)  # dtype: np.float64
+        _reseed()
+        p = XRRmin + (XRRmax - XRRmin) * _rand(m, self.d)  # dtype: np.float64
         p = self._custom_particle_initializer(p) if self._do_custom__particle_initializer else p
         fitness = self._cost_func(p)  # fitness evaluated m times
         v = np.zeros((m, self.d))
@@ -126,18 +144,18 @@ class SLPSO:
             center = np.ones((m, 1)) * np.mean(p, axis=0)
 
             # Random matrices
-            np.random.seed(int(time.time()*1000) % (2**32))
-            randco1 = np.random.rand(m, self.d)
-            np.random.seed(int(time.time()*1000) % (2**32))
-            randco2 = np.random.rand(m, self.d)
-            np.random.seed(int(time.time()*1000) % (2**32))
-            randco3 = np.random.rand(m, self.d)
+            _reseed()
+            randco1 = _rand(m, self.d)
+            _reseed()
+            randco2 = _rand(m, self.d)
+            _reseed()
+            randco3 = _rand(m, self.d)
             winidxmask = np.tile(np.arange(m).reshape(-1,1), (1, self.d))
-            winidx = winidxmask + np.ceil(np.random.rand(m, self.d) * ((m-1) - winidxmask))
+            winidx = winidxmask + np.ceil(_rand(m, self.d) * ((m-1) - winidxmask))
             pwin = p[winidx.astype(int), np.arange(self.d)]
 
             # Social learning
-            lpmask = np.tile(np.random.rand(m, 1) < PL, (1, self.d))
+            lpmask = np.tile(_rand(m, 1) < PL, (1, self.d))
             lpmask[m-1, :] = 0
             v1 = 1 * (randco1 * v + randco2 * (pwin - p) + c3 * randco3 * (center - p))
             p1 = p + v1
@@ -211,9 +229,15 @@ class GetLazinessBySLPSO(SLPSO):
 
         super().reset(cost_func_=None, d=d, low=low, high=high,  M=M, max_stagnation=max_stagnation)
 
-    def run(self, see_updates=False, see_time=False, maxfe=None):
-        """Returns (best_laziness_full, best_cost, best_laziness_small)."""
-        best_laziness_small, best_cost = super().run(see_updates=see_updates, see_time=see_time, maxfe=maxfe)
+    def run(self, see_updates=False, see_time=False, maxfe=None, seed=None):
+        """Returns (best_laziness_full, best_cost, best_laziness_small).
+
+        :param seed: if not None, PSO is deterministically seeded. Default None
+                     preserves the legacy non-deterministic behavior.
+        """
+        best_laziness_small, best_cost = super().run(
+            see_updates=see_updates, see_time=see_time, maxfe=maxfe, seed=seed,
+        )
 
         mask = self.env_original.is_padded == 0
         best_laziness_full = np.zeros(self.env_original.num_agents_max, dtype=np.float32)
@@ -275,10 +299,13 @@ class PSOActionOptimizer:
         self.num_cpus = num_cpus
         self._ray_initialized_here = False
 
-    def optimize(self, env, maxfe=None, see_updates=False, see_time=False):
+    def optimize(self, env, maxfe=None, see_updates=False, see_time=False, seed=None):
         """
         :param env: LazyAgentsCentralized instance, already reset()
         :param maxfe: max function evaluations (default: d*5000 inside SLPSO)
+        :param seed: if not None, PSO's internal RNG is deterministically seeded.
+                     Default None preserves the legacy (non-deterministic) behavior
+                     for backward compatibility with existing results.
         :return: (optimal_action, cost, elapsed_time)
                  optimal_action shape: (num_agents_max,), padded agents are 0
                  cost: negative episode reward (lower is better)
@@ -300,7 +327,7 @@ class PSOActionOptimizer:
 
         t_start = time.time()
         optimal_action, cost, _ = pso.run(
-            see_updates=see_updates, see_time=see_time, maxfe=maxfe
+            see_updates=see_updates, see_time=see_time, maxfe=maxfe, seed=seed,
         )
         elapsed_time = time.time() - t_start
 

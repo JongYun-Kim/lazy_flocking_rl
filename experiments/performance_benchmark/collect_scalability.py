@@ -188,7 +188,7 @@ def collect_rl(env_config, seeds, checkpoint, device, num_workers):
     return results
 
 
-def collect_pso(env_config, seeds, num_cpus, maxfe, partial_dir):
+def collect_pso(env_config, seeds, num_cpus, maxfe, partial_dir, seed_pso=False):
     from env.envs import LazyAgentsCentralized
     from utils.metaheuristics import PSOActionOptimizer
 
@@ -214,7 +214,9 @@ def collect_pso(env_config, seeds, num_cpus, maxfe, partial_dir):
         env.seed(seed)
         env.reset()
 
-        optimal_action, cost, elapsed = optimizer.optimize(env, maxfe=maxfe)
+        optimal_action, cost, elapsed = optimizer.optimize(
+            env, maxfe=maxfe, seed=seed if seed_pso else None,
+        )
 
         done = False
         r1, r2 = 0.0, 0.0
@@ -263,6 +265,11 @@ def main():
                         help="PSO max function evaluations (default: d*5000)")
     parser.add_argument("--num_episodes", type=int, default=None,
                         help="limit episodes per scale (default: all seeds)")
+    parser.add_argument("--seed_pso", action="store_true",
+                        help="propagate the per-episode seed into PSO's internal "
+                             "RNG (deterministic PSO). Default: off — preserves "
+                             "legacy non-deterministic PSO runs for compatibility "
+                             "with existing results.")
     args = parser.parse_args()
 
     agent_counts = args.agents if args.agents else SCALABILITY_AGENTS
@@ -299,7 +306,8 @@ def main():
             partial_dir = os.path.join(RESULTS_DIR, "scalability")
             os.makedirs(partial_dir, exist_ok=True)
             results = collect_pso(env_config, seeds, args.num_cpus,
-                                  args.maxfe, partial_dir)
+                                  args.maxfe, partial_dir,
+                                  seed_pso=args.seed_pso)
 
         elapsed = time.time() - t0
         tag = f"{args.method}_n{n}"
