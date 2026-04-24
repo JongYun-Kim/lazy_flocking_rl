@@ -9,7 +9,7 @@ RESULTS_DIR = os.path.join(THIS_DIR, "results")
 
 # Comparison 1: fixed 20 UAVs
 NUM_AGENTS = 20
-SEEDS = list(range(801, 901))  # 100 episodes
+SEEDS = list(range(1, 1001))  # 1000 episodes
 
 # Comparison 2: scalability sweep
 SCALABILITY_AGENTS = [8, 16, 32, 64, 128, 256, 512, 1024]
@@ -72,7 +72,7 @@ def save_results(method, results, env_config, extra=None, subdir=None):
         "method": method,
         "num_agents": env_config["num_agents_max"],
         "num_episodes": len(results),
-        "seeds": SEEDS,
+        "seeds": sorted({r["seed"] for r in results}),
         "env_config": env_config,
         "results": sorted(results, key=lambda x: x["seed"]),
     }
