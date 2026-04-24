@@ -86,20 +86,20 @@ All numbers are means over the same 100 seeded episodes. $J$ is the per-episode 
 
 | Model | Shared backbone | Params | Checkpoint | $J$ | Gap vs Transformer | ±std | Converged | Mean episode length (steps) |
 |-------|-----------------|--------|-----------|-----|--------------------|------|-----------|------------------------------|
-| **Transformer (proposed)** | **Yes** | **875 K** | **74** | **84.0** | **—** | **21.8** | **98 %** | **556.5** |
-| ACS | — | — | — | 106.4 | +22.3 | 39.6 | 96 % | 632.3 |
-| MLP #2  (higher learning rate) | No | 292 K | 52 | 162.6 | +78.6 | 4.6 | 0 % | 1000.0 |
-| MLP #5  (wider, param-matched) | No | 872 K | 268 | 181.8 | +97.8 | 5.9 | 0 % | 1000.0 |
-| MLP #4  (LR schedule + entropy annealing) | No | 292 K | 232 | 183.7 | +99.7 | 9.7 | 0 % | 1000.0 |
-| MLP #8  (shared backbone, wider) | Yes | 598 K | 234 | 189.7 | +105.7 | 8.8 | 0 % | 1000.0 |
-| MLP #0  (baseline) | No | 292 K | 37 | 190.3 | +106.3 | 1.6 | 0 % | 1000.0 |
-| MLP #6  (wider + deeper) | No | 1,569 K | 276 | 192.9 | +108.9 | 12.8 | 0 % | 1000.0 |
-| MLP #3  (LR schedule) | No | 292 K | 90 | 197.1 | +113.1 | 16.0 | 0 % | 1000.0 |
-| MLP #9  (shared, wider + deeper, param-matched) | Yes | 874 K | 259 | 197.4 | +113.4 | 14.9 | 0 % | 1000.0 |
-| MLP #11 (deterministic, param-matched) | No | 872 K | 130 | 199.2 | +115.1 | 10.9 | 0 % | 1000.0 |
-| MLP #1  (deterministic actions) | No | 292 K | 300 | 201.1 | +117.1 | 12.5 | 0 % | 1000.0 |
-| MLP #7  (shared backbone, baseline) | Yes | 168 K | 281 | 201.7 | +117.7 | 11.9 | 0 % | 1000.0 |
-| MLP #10 (shared, deterministic, param-matched) | Yes | 874 K | 54 | 204.0 | +120.0 | 10.5 | 0 % | 1000.0 |
+| **Transformer (proposed)** | **Yes** | **875 K** | **74** | **92.8** | **—** | **25.0** | **98 %** | **556.5** |
+| ACS | — | — | — | 129.5 | +36.7 | 55.4 | 96 % | 632.3 |
+| MLP #2  (higher learning rate) | No | 292 K | 52 | 154.3 | +61.5 | 6.8 | 0 % | 1000.0 |
+| MLP #5  (wider, param-matched) | No | 872 K | 268 | 193.1 | +100.3 | 11.8 | 0 % | 1000.0 |
+| MLP #4  (LR schedule + entropy annealing) | No | 292 K | 232 | 199.6 | +106.8 | 18.7 | 0 % | 1000.0 |
+| MLP #0  (baseline) | No | 292 K | 37 | 209.8 | +117.0 | 3.7 | 0 % | 1000.0 |
+| MLP #8  (shared backbone, wider) | Yes | 598 K | 234 | 212.4 | +119.6 | 18.7 | 0 % | 1000.0 |
+| MLP #6  (wider + deeper) | No | 1,569 K | 276 | 224.1 | +131.3 | 23.1 | 0 % | 1000.0 |
+| MLP #11 (deterministic, param-matched) | No | 872 K | 130 | 238.8 | +146.0 | 23.3 | 0 % | 1000.0 |
+| MLP #3  (LR schedule) | No | 292 K | 90 | 239.9 | +147.1 | 32.3 | 0 % | 1000.0 |
+| MLP #9  (shared, wider + deeper, param-matched) | Yes | 874 K | 259 | 240.4 | +147.6 | 32.5 | 0 % | 1000.0 |
+| MLP #1  (deterministic actions) | No | 292 K | 300 | 247.2 | +154.4 | 26.3 | 0 % | 1000.0 |
+| MLP #7  (shared backbone, baseline) | Yes | 168 K | 281 | 248.6 | +155.8 | 25.8 | 0 % | 1000.0 |
+| MLP #10 (shared, deterministic, param-matched) | Yes | 874 K | 54 | 253.7 | +160.9 | 22.2 | 0 % | 1000.0 |
 
 For every MLP variant, the mean episode length is exactly the 1000-step cap because not a single evaluation episode triggered the cohesion criterion; the Transformer and ACS, by contrast, terminate early in nearly all episodes.
 
@@ -111,9 +111,9 @@ These are direct observations from the results table.
 
 2. **Network capacity is not the bottleneck.** MLP variants with parameter counts matched to the Transformer (872–874 K, variants #5, #9, #10, #11) or substantially exceeding it (1.57 M in variant #6) all failed to converge. Capacity does not explain the gap.
 
-3. **Sharing the policy/value backbone does not close the gap.** The four shared-backbone variants (#7–#10) — which mirror the Transformer's architectural choice — all failed. The best of them (#8) still has a cost gap of +105.7 vs. the Transformer.
+3. **Sharing the policy/value backbone does not close the gap.** The four shared-backbone variants (#7–#10) — which mirror the Transformer's architectural choice — all failed. The best of them (#8) still has a cost gap of +119.6 vs. the Transformer.
 
-4. **Hyperparameter tuning reduces cost but does not enable convergence.** The constant higher learning rate (#2) yields the lowest MLP cost ($J = 162.6$), yet still converges 0 % of the time and remains worse than the non-learning ACS baseline ($J = 106.4$). Learning-rate scheduling and entropy-bonus annealing give only marginal further reductions in $J$.
+4. **Hyperparameter tuning reduces cost but does not enable convergence.** The constant higher learning rate (#2) yields the lowest MLP cost ($J = 154.3$), yet still converges 0 % of the time and remains worse than the non-learning ACS baseline ($J = 129.5$). The other tested hyperparameter schemes (learning-rate schedule, and learning-rate schedule with entropy-bonus annealing) do not improve on this and, in the case of the plain LR schedule (#3), yield a cost worse than the default baseline (#0).
 
 5. **Deterministic action distributions do not help.** Three variants (#1, #10, #11) reproduce the Transformer's effectively deterministic action output via a fixed low log-standard-deviation; none converge.
 
@@ -136,4 +136,4 @@ Under this interpretation, the observed insensitivity to parameter count, backbo
 - **Training:** twelve trials, six at a time in two waves, ≈ 10 h total wall-clock
 - **Evaluation:** 100 seeded episodes per method, sequential single-process execution, ≈ 31 min total wall-clock (restricted to 64 of the host's 72 CPUs)
 - **Reproducibility:** identical environment initial states and random seeds (1–100) across all methods; policy actions are deterministic (`explore=False`).
-- **Raw data:** per-episode cost sums and episode lengths are stored in `logs/eval_v3_L1L2_results.json`; the per-episode $J$ values reported here correspond to the negated `rewards_L2` entries. An earlier report using the L1-based cost variant is preserved as `mlp_ablation_report_L1.md`.
+- **Raw data:** per-episode cost sums and episode lengths are stored in `logs/eval_v3_results.json`; the per-episode $J$ values reported here correspond to the negated `rewards_L2` entries. An earlier report using the L1-based cost variant is preserved as `mlp_ablation_report_L1.md`.

@@ -1069,7 +1069,7 @@ class LazyAgentsCentralized(gym.Env):
         # Compute reward of all agents into a scalar: centralized
         # control_cost = (self.v / self.num_agents) * np.sum(u_t ** 2)
         control_cost_L1 = self.dt * (self.v / self.num_agents) * np.linalg.norm(u_t, 1)  # from the paper
-        control_cost_L2 = self.dt * (self.v / self.num_agents) * np.linalg.norm(u_t)  # L2 norm
+        control_cost_L2 = self.dt * (self.v / self.num_agents) * np.sum(u_t ** 2)  # sum of squares; matches the paper's J control term
         fuel_cost = self.dt
         # Shape of reward: (1,)  TODO: check the data types!
         total_cost_L1 = control_cost_L1 + self.rho * fuel_cost
