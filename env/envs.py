@@ -21,8 +21,6 @@ class LazyAgentsCentralized(gym.Env):
     - Note (2): with the default settings, the maximum number of time steps was 1814 in the test
     - Note (3): with the default settings, the average number of time steps was 572.4 in the test
     """
-    # TODO: [x] data types: 64-bit float/integer to support actions from an outer scope (e.g. RLlib)
-    # TODO: [x] use dataclass for config instead of dict! (type-safer and more readable; lighter init)
 
     def __init__(self, config):
         """
@@ -148,8 +146,6 @@ class LazyAgentsCentralized(gym.Env):
 
         # Define action space
         # Laziness vector; padding included
-        # TODO: continuous actions? VS discrete actions?
-        #       If continuous, what's the action distribution?
         self.action_space = Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.float32)
 
         # Define observation space
@@ -201,11 +197,6 @@ class LazyAgentsCentralized(gym.Env):
         # Check convergence
         self.std_pos_hist = None  # shape (self.max_time_step,)
         self.std_vel_hist = None  # shape (self.max_time_step,)
-
-        # Backward compatibility
-        self.num_agent = None
-        self.num_agent_min = None
-        self.num_agent_max = None
 
         # Skip observation computation (for PSO where obs is discarded)
         self._skip_obs = False
@@ -268,12 +259,7 @@ class LazyAgentsCentralized(gym.Env):
         # Pad agent states: it concatenates agent states with padding
         self.agent_states = self.pad_states()
 
-        # Initialize control input
-        # c_init = np.ones(self.num_agents_max, dtype=np.float32)
-        # self.u = self.update_u(c=c_init)  # TODO: think about the timing of this: zero vs get it from current state
-        # There's nothing to initialize for control input because it's a function of the state in the previous time step
-        # Hence, it doesn't exist at the initial time step (t=0); self.u == None
-        # Also, w_0 == zeros; No control at all, you dumb ass :-(
+        # No control input at t=0: w_0 = 0 because u is a function of the previous state
 
         # Get observation in a dict
         observation = self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs)
@@ -448,8 +434,6 @@ class LazyAgentsCentralized(gym.Env):
 
     def update_topology(self,
                         changes_in_agents=None  # shape: (num_agents_max,); 1: gain; -1: loss; 0: no change
-                        # TODO: Check if this is the correct shape
-                        #       and if you really need None
                         ):
         if changes_in_agents is None:
             return None
@@ -572,10 +556,9 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get the adjacency matrix
         assert self.is_padded is not None
-        assert self.net_topology_full is not None  # TODO: Check if it's duplicated
+        assert self.net_topology_full is not None
         mask = self.is_padded == 0 if mask is None else mask
         adj_mat = self.net_topology_full[mask, :][:, mask]  # shape: (num_agents, num_agents); (without padding)
-        # TODO: check if you actually get the shape in the run-time
 
         return adj_mat  # a copy of the adjacency matrix; not linked to the original object (i.e. self.adjacency_matrix)
 
@@ -710,7 +693,7 @@ class LazyAgentsCentralized(gym.Env):
         # Get agent changes
         #  We lose or gain agents after updating the state
         #  This is because the agents may notice the changes in the next time step
-        changes_in_agents = self.get_agent_changes()  # TODO: Not supported yet
+        changes_in_agents = self.get_agent_changes()
 
         # Update the network topology
         #  We may lose or gain edges from the changes of the swarm.
@@ -793,95 +776,6 @@ class LazyAgentsCentralized(gym.Env):
         #
         return NotImplemented
 
-    def update_u(self, c, mask=None, _w_ang=None, _w_pos=None):  # Has been deprecated !!!!!!! use get_u instead !!!!!!!
-        # c: laziness; shape: (num_agents_max,)
-        # mask: mask for the non-padding agents; shape: (num_agents_max,)
-        # _w_ang: angular weight; shape: (num_agents_max,)
-        # _w_pos: positional weight; shape: (num_agents_max,)
-
-        # Get mask
-        mask = self.is_padded == 0 if mask is None else mask
-        assert c.shape == mask.shape
-        assert c.shape == (self.num_agents_max,)
-        # assert c.dtype == np.float32  # TODO: c comes from outer scope; so it may not be float32; may need astype???
-        assert mask.dtype == np.bool  # np.bool_ depending on your ray (or numpy) version
-        assert np.sum(mask) == self.num_agents  # TODO: remove the asserts once the code is stable
-        # Check if _w_ang and _w_pos are vectors of self.num_agents_max
-        assert _w_ang is None or _w_ang.shape == (self.num_agents_max,)
-        assert _w_pos is None or _w_pos.shape == (self.num_agents_max,)
-
-        # Get variables (local infos)
-        # rel_pos ((x_j-x_i), (y_j-y_i)): relative position; shape: (num_agents, num_agents, 2)
-        # rel_dist (r_ij): relative distance; all positive (0 inc); shape: (num_agents, num_agents)
-        rel_pos, rel_dist = self.get_relative_info(self.agent_pos, get_dist=True, mask=mask, get_local=True)
-        # rel_ang (θ_j - θ_i): relative angle; shape: (num_agents, num_agents): 2D (i.e. dist info)
-        _, rel_ang = self.get_relative_info(self.agent_ang, get_dist=True, mask=mask, get_local=True)
-        # rel_vel ((vx_j-vx_i), (vy_j-vy_i)): relative velocity; shape: (num_agents, num_agents, 2)
-        rel_vel, _ = self.get_relative_info(self.agent_vel, get_dist=False, mask=mask, get_local=True)
-
-        # 1. Compute alignment control input
-        # u_cs = (lambda/n(N_i)) * sum_{j in N_i}[ psi(r_ij)sin(θ_j - θ_i) ],
-        # where N_i is the set of neighbors of agent i,
-        # psi(r_ij) = 1/(1+r_ij^2)^(beta),
-        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
-        psi = (1 + rel_dist**2) ** (-self.beta)  # shape: (num_agents, num_agents)
-        alignment_error = np.sin(rel_ang)  # shape: (num_agents, num_agents)
-        Neighbors = self.view_adjacency_matrix(mask=mask)  # shape: (num_agents, num_agents); from full network topology
-        # u_cs: shape: (num_agents,)
-        u_cs = (self.lambda_ / Neighbors.sum(axis=1)) * (Neighbors * psi * alignment_error).sum(axis=1)
-
-        # 2. Compute cohesion control input
-        # u_coh[i] = (sigma/N*V)
-        #            * sum_(j in N_i)
-        #               [
-        #                   {
-        #                       (K1/(2*r_ij^2))*<-rel_vel, -rel_pos> + (K2/(2*r_ij^2))*(r_ij-R)
-        #                   }
-        #                   * <[-sin(θ_i), cos(θ_i)]^T, rel_pos>
-        #               ]
-        # where N_i is the set of neighbors of agent i,
-        # r_ij = ||X_j - X_i||, X_i = (x_i, y_i),
-        # rel_vel = (vx_j - vx_i, vy_j - vy_i),
-        # rel_pos = (x_j - x_i, y_j - y_i),
-        sig_NV = self.sigma / (self.v * Neighbors.sum(axis=1))  # shape: (num_agents,)
-        r_ij = rel_dist + (np.eye(self.num_agents) * np.finfo(float).eps)  # shape: (num_agents, num_agents)
-        k1_2rij2 = self.k1 / (2 * r_ij**2)  # shape: (num_agents, num_agents)
-        k2_2rij = self.k2 / (2 * r_ij)  # shape: (num_agents, num_agents)
-        v_dot_p = np.einsum('ijk,ijk->ij', rel_vel, rel_pos)  # shape: (num_agents, num_agents)
-        rij_R = rel_dist - self.R  # shape: (num_agents, num_agents)
-        ang_vec = np.concatenate([-np.sin(self.agent_ang[mask]), np.cos(self.agent_ang[mask])], axis=1)  # (num_a, 2)
-        ang_vec = np.tile(ang_vec[:, np.newaxis, :], (1, self.num_agents, 1))  # (num_agents, num_agents, 2)
-        ang_dot_p = np.einsum('ijk,ijk->ij', ang_vec, rel_pos)  # shape: (num_agents, num_agents)
-        need_sum = (k1_2rij2 * v_dot_p + k2_2rij * rij_R) * ang_dot_p  # shape: (num_agents, num_agents)
-        u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # shape: (num_agents,)
-
-        # 3. Compute separation control input
-        # TO!DO!: implement separation control input when it is needed; for now, no separation control input
-        # u_sep =
-
-        # 4. Compute communication control input
-        # Not implemented yet as we use fixed communication topology (regardless of actual distances)
-        # u_comm =
-
-        # 5. Compute control input
-        w_ang = _w_ang[mask] if _w_ang is not None else 1  # supposed to be a numpy array but use scalar for efficiency
-        w_pos = _w_pos[mask] if _w_pos is not None else 1
-        u_local = w_ang * u_cs + w_pos * u_coh  # + u_sep + u_comm  # shape: (num_agents,)
-        # Saturation
-        u_local = np.clip(u_local, -self.u_max, self.u_max)  # shape: (num_agents,)
-        # Consider laziness
-        u = np.zeros(self.num_agents_max, dtype=np.float32)  # shape: (num_agents_max,)
-        # Starting from zeros is important to avoid non-padded agents to have non-zero control inputs.
-        # This is because the model's output isn't perfectly masked as the std of the output cannot be an absolute zero.
-        # If you are dealing with a Gaussian action distribution in your RL, the output is zero with a zero probability,
-        # which can still happen though. (An event with zero probability can still happen, mathematically speaking.)
-        u[mask] = c[mask] * u_local
-
-        # print(rel_dist[0, :].reshape(4, 5))
-        # print(rel_ang[0, :].reshape(4, 5))
-
-        return u  # shape: (num_agents_max,)
-
     def get_u(self, mask=None, get_decomposed_u=False):
         # mask: mask for the non-padding agents; shape: (num_agents_max,)
         # get_decomposed_u: if True, returns u_decomposed; otherwise, returns u
@@ -889,9 +783,9 @@ class LazyAgentsCentralized(gym.Env):
         # Get mask
         mask = self.is_padded == 0 if mask is None else mask
         assert mask.dtype == np.bool  # np.bool_ depending on your ray (or numpy) version
-        assert np.sum(mask) == self.num_agents  # TODO: remove the asserts once the code is stable
+        assert np.sum(mask) == self.num_agents
 
-        # Relative quantities via single broadcast (replaces 3 get_relative_info calls)
+        # Relative quantities via single broadcast
         pos = self.agent_pos[mask]   # (num_agents, 2)
         ang = self.agent_ang[mask]   # (num_agents, 1)
         vel = self.agent_vel[mask]   # (num_agents, 2)
@@ -924,15 +818,7 @@ class LazyAgentsCentralized(gym.Env):
         need_sum = (k1_2rij2 * v_dot_p + k2_2rij * rij_R) * ang_dot_p  # (num_agents, num_agents)
         u_coh = sig_NV * (Neighbors * need_sum).sum(axis=1)  # (num_agents,)
 
-        # 3. Compute separation control input
-        # TODO: implement separation control input when it is needed; for now, no separation control input
-        # u_sep =
-
-        # 4. Compute communication control input
-        # Not implemented yet as we use fixed communication topology (regardless of actual distances)
-        # u_comm =
-
-        # 5. Compute control input
+        # Compute control input
         if not get_decomposed_u:
             u_local = u_cs + u_coh  # + u_sep + u_comm  # shape: (num_agents,)
             # Saturation
@@ -966,53 +852,13 @@ class LazyAgentsCentralized(gym.Env):
 
             return u, u_decomposed  # shape: (num_agents_max,)
 
-    def get_relative_info(self, data, get_dist=False, mask=None, get_local=False):
-        # Returns the relative information of the agents (e.g. relative position, relative angle, etc.)
-        # data: shape (num_agents_max, data_dim)
-        # mask: shape (num_agents_max, num_agents_max)
-
-        # Define mask; enables to take into account non-padded data only
-        mask = self.is_padded == 0 if mask is None else mask
-        assert mask.dtype == np.bool_  # np.bool probably deprecated (check your numpy/ray versions; not sure...)
-
-        # Get dimension of the data
-        assert data.ndim == 2  # we use a 2D array for the data
-        assert data[mask].shape[0] == self.num_agents  # TODO: do we have to check both dims?
-        assert data.shape[0] == self.num_agents_max
-        data_dim = data.shape[1]
-
-        # Compute relative data
-        # rel_data: shape (num_agents_max, num_agents_max, data_dim); rel_data[i, j] = data[j] - data[i]
-        # rel_data_local: shape (num_agents, num_agents, data_dim)
-        # rel_data_local = data[mask] - data[mask, np.newaxis, :]
-        rel_data_local = data[np.newaxis, mask, :] - data[mask, np.newaxis, :]
-        if get_local:
-            rel_data = rel_data_local
-        else:
-            rel_data = np.zeros((self.num_agents_max, self.num_agents_max, data_dim), dtype=np.float32)
-            rel_data[np.ix_(mask, mask, np.arange(data_dim))] = rel_data_local
-            # rel_data[mask, :, :][:, mask, :] = rel_data_local  # not sure; maybe 2-D array (not 3-D) if num_true = 1
-
-        # Compute relative distances
-        # rel_dist: shape (num_agents_max, num_agents_max)
-        # Note: data are all non-negative!!
-        if get_dist:
-            rel_dist = np.linalg.norm(rel_data, axis=2) if data_dim > 1 else rel_data.squeeze()
-        else:
-            rel_dist = None
-
-        # get_local==False: (num_agents_max, num_agents_max, data_dim), (num_agents_max, num_agents_max)
-        # get_local==True: (num_agents, num_agents, data_dim), (num_agents, num_agents)
-        # get_dist==False: (n, n, d), None
-        return rel_data, rel_dist
-
     def update_state(self, u, mask):
         # Update the state based on the control input
         if self.use_custom_ray:  # memory inefficient! but ray requires immutable objects..
-            self.agent_omg = np.copy(self.agent_omg)  # TODO: testing.. ray
-            self.agent_pos = np.copy(self.agent_pos)  # TODO: testing.. ray
-            self.agent_ang = np.copy(self.agent_ang)  # TODO: testing.. ray
-            self.agent_vel = np.copy(self.agent_vel)  # TODO: testing.. ray
+            self.agent_omg = np.copy(self.agent_omg)
+            self.agent_pos = np.copy(self.agent_pos)
+            self.agent_ang = np.copy(self.agent_ang)
+            self.agent_vel = np.copy(self.agent_vel)
 
         # (1) Update angular velocity:
         # >>  w_{t+1} = u_{t+1}
@@ -1031,7 +877,6 @@ class LazyAgentsCentralized(gym.Env):
 
         # (4) Update velocity:
         # >>  v_{t+1} = V * [cos(ang_{t+1}), sin(ang_{t+1})]; Be careful: ang_{t+1} is the angle at time t+1
-        # TODO: think about the masking because cos(0) is not 0; may cause issues when the net's not fully-connected
         self.agent_vel[mask] = self.v * np.concatenate(
             [np.cos(self.agent_ang[mask]), np.sin(self.agent_ang[mask])], axis=1)
 
@@ -1049,10 +894,7 @@ class LazyAgentsCentralized(gym.Env):
         #                         ==  1: agent_i is gained as a new agent
         #                         == -1: agent_i is lost
 
-        # TODO: Implement your swarm group dynamics here
-        # TODO: For now, no changes in the swarm
-        # changes_in_agents = np.zeros((self.num_agents_max,), dtype=np.int32)
-        changes_in_agents = None  # effectively same as the above: the zeros array
+        changes_in_agents = None
 
         return changes_in_agents  # shape: (num_agents_max,) dtype: int32
 
@@ -1064,14 +906,13 @@ class LazyAgentsCentralized(gym.Env):
         u_t = self.u_lazy
 
         # Check the control input of the padding agents
-        assert np.all(u_t[self.is_padded == 1] == 0)  # TODO: delete this line after debugging or stabilizing the code
+        assert np.all(u_t[self.is_padded == 1] == 0)
 
         # Compute reward of all agents into a scalar: centralized
         # control_cost = (self.v / self.num_agents) * np.sum(u_t ** 2)
         control_cost_L1 = self.dt * (self.v / self.num_agents) * np.linalg.norm(u_t, 1)  # from the paper
         control_cost_L2 = self.dt * (self.v / self.num_agents) * np.sum(u_t ** 2)  # sum of squares; matches the paper's J control term
         fuel_cost = self.dt
-        # Shape of reward: (1,)  TODO: check the data types!
         total_cost_L1 = control_cost_L1 + self.rho * fuel_cost
         total_cost_L2 = control_cost_L2 + self.rho * fuel_cost
         reward_L1 = - total_cost_L1  # maximize the reward == minimize the cost
@@ -1079,7 +920,7 @@ class LazyAgentsCentralized(gym.Env):
         # i.e. reward is negative in most cases in this environment
 
         # Check the data type of the reward
-        assert isinstance(reward_L1, float) or isinstance(reward_L1, np.float32)  # TODO: delete this line as well, l8r
+        assert isinstance(reward_L1, float) or isinstance(reward_L1, np.float32)
 
         rewards = np.array([reward_L1, reward_L2], dtype=np.float32)
 
@@ -1100,41 +941,6 @@ class LazyAgentsCentralized(gym.Env):
             # print("Task was not completed within the maximum time step!")
 
         return rewards
-
-    def is_done(self, mask=None):  # almost deprecated
-        # Check if the swarm converged
-        # Mine (but paper actually said these):
-        #   (1) velocity deviation is smaller than a threshold v_th
-        #   (2) position deviation is smaller than a threshold p_th
-        #   (3) (independently) maximum number of time steps is reached
-
-        # Get mask
-        mask = self.is_padded == 0 if mask is None else mask
-
-        # 1. Check velocity standard deviation
-        vel_distribution = self.agent_vel[mask]  # shape: (num_agents, 2)
-        vel_std = np.std(vel_distribution, axis=0)  # shape: (2,)
-        vel_std = np.mean(vel_std)  # shape: (1,) or (,)
-        # vel_converged = True if np.all(vel_std < self.vel_err_allowed) else False
-        vel_converged = True if vel_std < self.std_vel_converged else False
-
-        # 2. Check position deviation
-        pos_distribution = self.agent_pos[mask]  # shape: (num_agents, 2)
-        pos_std = np.std(pos_distribution, axis=0)  # shape: (2,)
-        pos_std = np.mean(pos_std)  # shape: (1,) or (,)
-        # pos_converged = True if np.all(pos_std < self.pos_err_allowed) else False
-        pos_converged = True if pos_std < self.std_pos_converged else False
-
-        done = True if vel_converged and pos_converged else False
-
-        # 3. Check if the maximum number of time steps is reached
-        if self.time_step >= self.max_time_step:
-            done = True
-
-        print(f"time_step: {self.time_step}, max_time_step: {self.max_time_step}")
-        print(f"  vel_deviation: {vel_std},\n  pos_deviation: {pos_std},\n  done: {done}")
-
-        return done
 
     def is_done_in_paper(self, mask=None):
         # Check if the swarm converged or the episode is done
@@ -1159,8 +965,8 @@ class LazyAgentsCentralized(gym.Env):
         vel_std = np.sqrt(np.sum(np.var(vel_distribution, axis=0)))  # shape: (1,) or (,)
         # Store the standard deviations
         if self.use_custom_ray:  # memory inefficient... but ray requires immutable objects
-            self.std_pos_hist = np.copy(self.std_pos_hist)  # TODO: ray...
-            self.std_vel_hist = np.copy(self.std_vel_hist)  # TODO: ray...
+            self.std_pos_hist = np.copy(self.std_pos_hist)
+            self.std_vel_hist = np.copy(self.std_vel_hist)
         self.std_pos_hist[self.time_step] = pos_std
         self.std_vel_hist[self.time_step] = vel_std
 
@@ -1359,28 +1165,6 @@ class LazyAgentsCentralized(gym.Env):
 
         return fig_current_agents, ax_current_agents
 
-    def update_env_object(self, do_auto_step=False, use_custom_ray=False):  # for backward compatibility
-        # Enables the old environment instance is compatible with the new version
-        # when you use serialized environments of the old version in the new version.
-        if hasattr(self, "num_agents"):
-            if hasattr(self, "num_agent"):
-                print("The environment is already the newer version.")
-            else:
-                self.num_agent = None
-                self.num_agent_max = None
-                self.num_agent_min = None
-                assert hasattr(self, "auto_step") and hasattr(self, "use_custom_ray")
-                print("The environment is a bit old version. Just num_agent(_x) weren't defined.")
-        else:
-            if hasattr(self, "num_agent"):
-                self.num_agents = self.num_agent
-                self.num_agents_max = self.num_agent_max
-                self.num_agents_min = self.num_agent_min
-                self.do_auto_step = do_auto_step
-                self.use_custom_ray = use_custom_ray
-            else:
-                print("No num_agent, no num_agents? wtf!")
-
     def compute_heuristic_action(self, mask=None, use_fixed_lazy=None, num_lazy_agents=1):
         # This method computes the heuristic action based on the current state.
 
@@ -1426,47 +1210,6 @@ class LazyAgentsCentralized(gym.Env):
 
         return lazy_action
 
-    def compute_heuristic_action_bk(self, mask=None, use_fixed_lazy=None, num_lazy_agents=1):
-        # This method computes the heuristic action based on the current state.
-
-        # Get mask
-        mask = self.is_padded == 0 if mask is None else mask
-
-        # Get fitness vector
-        self.heuristic_fitness = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
-        self.heuristic_fitness[mask] = self.alpha[mask] * self.gamma[mask]  # shape: (num_agents_max,)
-        # Assert the fitness is in the range [0, 1] unless self.time_step==0
-        if self.time_step > 0:
-            assert np.all(0 <= self.heuristic_fitness) and np.all(self.heuristic_fitness <= 1)
-
-        # Get who's lazy: index of the lazy agent (highest fitness)
-        assert (num_lazy_agents == 1) or (isinstance(num_lazy_agents, int) and num_lazy_agents > 1),\
-            "Invalid value for num_lazy_agents"
-        use_fixed_lazy = self._use_fixed_lazy_idx if use_fixed_lazy is None else use_fixed_lazy
-        if use_fixed_lazy:
-            lazy_agent_idx = self.fixed_lazy_idx
-        else:
-            lazy_agent_idx = np.argmax(self.heuristic_fitness)  # shape: (,)
-        # Assert the lazy agent is alive
-        assert mask[lazy_agent_idx]
-
-        # Get the laziness value of the lazy agent (sole-lazy heuristic in this case)
-        G = 0.8  # gain from the paper; prevents C_lazy(t) from decreasing near zero
-        # Assert the laziness is in the range [0, 1-G]
-        if self.time_step > 0:
-            laziness = 1 - G * self.heuristic_fitness[lazy_agent_idx]  # shape: (,)
-            assert 1-G <= laziness <= 1
-        elif self.time_step == 0:
-            laziness = 1-G  # starts from 1-G (minimum laziness)
-        else:
-            raise ValueError(f"self.time_step must be non-negative! But self.time_step=={self.time_step}")
-
-        # Get lazy action
-        lazy_action = np.zeros((self.num_agents_max,), dtype=np.float32)
-        lazy_action[mask] = 1.0  # locally fully active
-        lazy_action[lazy_agent_idx] = laziness  # assigns the laziness to the lazy agent
-
-        return lazy_action
 
     def update_r_max_and_get_alpha_n_gamma(self, mask=None, init_update=False):
         # Get mask
@@ -1506,7 +1249,7 @@ class LazyAgentsCentralized(gym.Env):
         gamma = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
         gamma[mask] = 0.5 * (1 - cos_phi[mask])
         # Clip gamma to be in the range [0, 1]
-        # Note: this is necessary because of the floating point error; fking precision issues
+        # Clip to [0, 1] to handle floating point error
         gamma[mask] = np.clip(gamma[mask], 0, 1)
 
         return alpha, gamma
@@ -1518,7 +1261,7 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         super().__init__(config)
 
         # Get pendulum reward weight from config
-        # Note: the defualt value is not optimal; they were determined for backward compatibility
+        # Note: the default values are not optimal; they were determined for backward compatibility
         self.w_control = self.config["w_control"] if "w_control" in self.config else 0.02  # 0.001
         self.w_pos = self.config["w_pos"] if "w_pos" in self.config else 1.0  # 1.0
         self.w_vel = self.config["w_vel"] if "w_vel" in self.config else 0.2  # 0.2
@@ -1533,7 +1276,6 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         control_reward = target_reward + self.rho * self.dt  # remove fuel cost
 
         # Get position error reward
-        # TODO: What is pos error reward?
         std_pos = self.std_pos_hist[self.time_step]
         std_pos_target = self.std_pos_converged - 2.5
         std_pos_error = (std_pos - std_pos_target)**2  # (100-40)**2 = 3600
@@ -1542,7 +1284,6 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         # pos_error_reward = - (1/60) * np.maximum(std_pos_error, 0.0)
 
         # Get velocity error reward
-        # TODO: What is vel error reward?
         std_vel = self.std_vel_hist[self.time_step]
         std_vel_target = self.std_vel_converged - 0.05
         std_vel_error = (std_vel - std_vel_target)**2  # (15-0.05)**2 = 223.5052
