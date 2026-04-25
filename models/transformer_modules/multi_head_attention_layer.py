@@ -6,7 +6,6 @@ import torch.nn.functional as F
 
 
 class MultiHeadAttentionLayer(nn.Module):
-    # TODO: Hey! use right notations for d_k, d_v, d_model following the original transformer paper.
 
     def __init__(self, d_model, h, q_fc, kv_fc, out_fc, dr_rate=0):
         super(MultiHeadAttentionLayer, self).__init__()
@@ -17,13 +16,6 @@ class MultiHeadAttentionLayer(nn.Module):
         self.q_fc = copy.deepcopy(q_fc)   # (d_embed_query, d_model)
         self.k_fc = copy.deepcopy(kv_fc)  # (d_embed_key,   d_model)
         self.v_fc = copy.deepcopy(kv_fc)  # (d_embed_value, d_model)
-        # TODO: Please remove the copy.deepcopy() if it is not necessary.
-        #  (maybe not necessary for q_fc but necessary for k_fc and v_fc)
-        #  In my understanding, uses of copy.deepcopy() are fine if it is used in __init__().
-        #  But, if I don't need a copy of the (input) object, I shouldn't use copy.deepcopy() for better performance.
-        # self.q_fc = nn.Linear(q_fc.in_features, q_fc.out_features, bias=q_fc.bias is not None)
-        # self.k_fc = nn.Linear(kv_fc.in_features, kv_fc.out_features, bias=kv_fc.bias is not None)
-        # self.v_fc = nn.Linear(kv_fc.in_features, kv_fc.out_features, bias=kv_fc.bias is not None)
 
         # W^O transforms the attention vectors to d_embed_MHA_out dimension (desired output dim, mostly idempotent)
         self.out_fc = out_fc                  # (d_model, d_embed_MHA_out)
@@ -40,7 +32,7 @@ class MultiHeadAttentionLayer(nn.Module):
             attention_score = attention_score.masked_fill(mask == 0, -1e9)
         attention_prob = F.softmax(attention_score, dim=-1)  # (n_batch, h, seq_len_query, seq_len_key)
         attention_prob = self.dropout(attention_prob)
-        out = torch.matmul(attention_prob, value)  # TODO: check if this is correct, dimension-wise
+        out = torch.matmul(attention_prob, value)
         return out  # (n_batch, h, seq_len_query, d_k)
 
     def forward(self, *args, query, key, value, mask=None):

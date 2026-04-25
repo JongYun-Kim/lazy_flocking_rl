@@ -8,8 +8,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.n_layer = n_layer
         self.layers = nn.ModuleList([copy.deepcopy(decoder_block) for _ in range(self.n_layer)])
-        self.norm = norm if norm is not None else nn.Identity()  # a placeholder; may break backward compatibility
-        # If possible use nn.Identity() instead of None as this way is more readable
+        self.norm = norm if norm is not None else nn.Identity()
 
     def forward(self, tgt, encoder_out, tgt_mask, src_tgt_mask):
         out = tgt
