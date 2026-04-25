@@ -15,12 +15,6 @@ if not hasattr(np, 'bool_'):
     np.bool_ = np.bool
 
 class LazyAgentsCentralized(gym.Env):
-    """
-    Lazy Agents environment
-    - Note (1): with the default settings, the average reward per step was -0.387909 in a 10000-episode test
-    - Note (2): with the default settings, the maximum number of time steps was 1814 in the test
-    - Note (3): with the default settings, the average number of time steps was 572.4 in the test
-    """
 
     def __init__(self, config):
         """
@@ -119,7 +113,7 @@ class LazyAgentsCentralized(gym.Env):
             if "std_vel_rate_converged" in self.config else 0.2  # m/s
         self.max_time_step = self.config["max_time_step"] if "max_time_step" in self.config else 2000
         self.incomplete_episode_penalty = self.config["incomplete_episode_penalty"] \
-            if "incomplete_episode_penalty" in self.config else -600
+            if "incomplete_episode_penalty" in self.config else 0
         assert self.incomplete_episode_penalty <= 0, "incomplete_episode_penalty must be less than 0 (or 0)"
         self.normalize_obs = self.config["normalize_obs"] if "normalize_obs" in self.config else False
         self.use_fixed_horizon = self.config["use_fixed_horizon"] if "use_fixed_horizon" in self.config else False
@@ -682,30 +676,14 @@ class LazyAgentsCentralized(gym.Env):
         # Extend your disturbance mechanism (here, it's an placeholder; identity process)
         return NotImplemented
 
-    def compute_auxiliary_reward(  # should not be static when overriding
+    def compute_auxiliary_reward(
             self,
-            *,              # enforce keyword arguments to avoid confusion
+            *,
             rewards,        # shape: (2,); 0: L1 norm; 1: L2 norm
-            target_reward,  # scalar; either L1 or L2 norm depending on the self.use_L2_norm
+            target_reward,  # scalar; either L1 or L2 norm depending on self.use_L2_norm
     ):
-        # This method is used to compute the auxiliary reward
-        # Please override this method in your task
-        # Use the following callback in your train script to see the original reward on the tensorboard
-        #     from ray.rllib.algorithms.callbacks import DefaultCallbacks
-        #     class MyCallbacks(DefaultCallbacks):
-        #         def on_episode_start(self, worker, episode, **kwargs):
-        #             episode.user_data["L1_reward_sum"] = 0
-        #             episode.user_data["L2_reward_sum"] = 0
-        #
-        #         def on_episode_step(self, worker, episode, **kwargs):
-        #             from_infos = episode.last_info_for()["original_rewards"]
-        #             episode.user_data["L1_reward_sum"] += from_infos[0]
-        #             episode.user_data["L2_reward_sum"] += from_infos[1]
-        #
-        #         def on_episode_end(self, worker, episode, **kwargs):
-        #             episode.custom_metrics["episode_L1_reward_sum"] = episode.user_data["L1_reward_sum"]
-        #             episode.custom_metrics["episode_L2_reward_sum"] = episode.user_data["L2_reward_sum"]
-        #
+        # Override in subclass to define a shaped reward. The original reward is logged
+        # via info["original_rewards"] — use RLlib callbacks to track it on tensorboard.
         return NotImplemented
 
     def get_u(self, mask=None, get_decomposed_u=False):
