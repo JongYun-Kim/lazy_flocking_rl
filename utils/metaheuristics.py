@@ -127,8 +127,6 @@ class SLPSO:
             p = p[rank, :]
             v = v[rank, :]
 
-            # Update best cost and position
-            old_best_cost = best_cost_ever
             best_y = fitness[m-1]
             best_p = p[m-1, :]
             if best_y < best_cost_ever:
@@ -357,7 +355,7 @@ def cost_func(p):
 
 
 if __name__ == "__main__":
-    # Problem configurations
+    # Smoke test: minimize a 30-d sphere function
     d = 30
     lu = np.array([-100 * np.ones(d), 100 * np.ones(d)], dtype=np.float32)
     M = 100
