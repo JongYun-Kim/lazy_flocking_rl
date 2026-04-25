@@ -150,11 +150,6 @@ class LazyAgentsCentralized(gym.Env):
 
         # Define observation space
         self.d_v = 6  # data dim; [x, y, vx, vy, theta, omega]
-        # low_bound_single_agent = np.array([-np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -self.u_max])
-        # high_bound_single_agent = np.array([np.inf, np.inf, np.inf, np.inf, np.inf, self.u_max])
-        # # TODO: Check the bounds; tighter bounds better? [inf, inf, v, v, pi, u_max]?
-        # low_bound_all_agents = np.tile(low_bound_single_agent, (self.num_agents_max, 1))
-        # high_bound_all_agents = np.tile(high_bound_single_agent, (self.num_agents_max, 1))
         low_bound_all_agents = -np.inf
         high_bound_all_agents = np.inf
 
@@ -165,7 +160,6 @@ class LazyAgentsCentralized(gym.Env):
             self.observation_space = Dict({
                 "agent_embeddings": Box(low=low_bound_all_agents, high=high_bound_all_agents,
                                         shape=(self.num_agents_max, self.d_v), dtype=np.float32),
-                # "net_topology": Box(low=0, high=1, shape=(self.num_agents_max, self.num_agents_max), dtype=np.int32),
                 "pad_tokens": Box(low=0, high=1, shape=(self.num_agents_max,), dtype=np.int32),
             })
         self.is_padded = None  # 1 if the task is padded, 0 otherwise; shape (num_agents_max,)
@@ -210,8 +204,6 @@ class LazyAgentsCentralized(gym.Env):
 
         # For plotting
         self.state_hist = None
-        # self.state_hist = np.zeros((self.max_time_step, self.num_agents_max, self.d_v), dtype=np.float32) \
-        #     if self.get_state_hist else None
 
         # Seed
         self.seed_value = None
@@ -220,10 +212,6 @@ class LazyAgentsCentralized(gym.Env):
         self.seed_value = seed
         np.random.seed(seed)
         super().seed(seed)
-
-    # def seed(self, seed=None):
-    #     self.np_random, seed = seeding.np_random(seed)
-    #     return [seed]
 
     def get_seed(self):
         return self.seed_value
@@ -251,9 +239,6 @@ class LazyAgentsCentralized(gym.Env):
         # (4) angular velocity; shape (num_agents_max, 1); it's a 2-D array !!!!
         self.agent_omg = np.zeros((self.num_agents_max, 1))
 
-        # self.u_fully_active: shape (num_agents_max,)
-        # self.u_fully_active_decomposed: shape (num_agents_max, 2)  # Keep the shape in your mind!
-        # self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max, dtype=np.float32))
         self.u_fully_active, self.u_fully_active_decomposed = self.get_u(get_decomposed_u=True)
 
         # Pad agent states: it concatenates agent states with padding
@@ -283,8 +268,6 @@ class LazyAgentsCentralized(gym.Env):
             self.r_max = np.zeros((self.num_agents_max,), dtype=np.float32)
             self.alpha, self.gamma = self.update_r_max_and_get_alpha_n_gamma(mask=mask, init_update=True)
             self.initial_lazy_indices = np.argsort(-self.alpha * self.gamma)  # shape: (num_agents_max)
-            # assert isinstance(self.fixed_lazy_indices, np.int64)
-            # assert np.all(mask[self.initial_lazy_indices])  # make sure if the agents are alive
         if not self._use_fixed_lazy_idx:
             for _ in range(4):
                 print("    The env uses variable lazy index !!!  Not recommended but for testing purposes !!!")
@@ -298,31 +281,24 @@ class LazyAgentsCentralized(gym.Env):
         else:
             agent_embeddings = self.agent_states[:, :self.d_v]
 
-            # # Get network topology
-            # net_topology = self.net_topology_full
-
             # Get padding tokens
             pad_tokens = self.is_padded
 
             # Get observation in a dict
             obs = {
                 "agent_embeddings": agent_embeddings,
-                # "net_topology": net_topology,
                 "pad_tokens": pad_tokens,
             }
 
-        # Replace the last data dim of obs["agent_embeddings"] with the self.u_fully_active (be careful about the shape)
-        # obs["agent_embeddings"][:, 5] = self.u_fully_active
+        # Replace heading dim with u_fully_active (ACS control input as feature)
         obs["agent_embeddings"][:, 4] = self.u_fully_active
 
         if self.normalize_obs:
             # Normalize the positions by the half of the length of boundary
             obs["agent_embeddings"][:, :2] = obs["agent_embeddings"][:, :2] / (self.l_bound / 2.0)
-            # obs["agent_embeddings"][:, :2] = obs["agent_embeddings"][:, :2] / 125.0  # use trained val at eval
             # Normalize the velocities by the maximum velocity
             obs["agent_embeddings"][:, 2:4] = obs["agent_embeddings"][:, 2:4] / self.v
-            # Normalize the anngle by pi
-            # obs["agent_embeddings"][:, 4] = obs["agent_embeddings"][:, 4] / np.pi
+            # Normalize u_fully_active by the maximum turn rate
             obs["agent_embeddings"][:, 4] = obs["agent_embeddings"][:, 4] / self.u_max
             # Normalize the angular velocity by the maximum angular velocity
             obs["agent_embeddings"][:, 5] = obs["agent_embeddings"][:, 5] / self.u_max
@@ -370,11 +346,6 @@ class LazyAgentsCentralized(gym.Env):
         # Wrap the agent angles
         agent_angles_transformed = self.wrap_to_pi(agent_angles_transformed)  # shape (num_agents, 1)
 
-        # Calculate the relative velocity = [v*cos(ang_new), v*sin(ang_new)]  # shape (num_agents, 2)
-        # This is omitted for faster computation (concatenating them in the next step)
-        # agent_velocities_transformed = self.v * np.concatenate((np.cos(agent_angles_transformed),
-        #                                                         np.sin(agent_angles_transformed)), axis=1)
-
         # Concatenate the transformed states as embeddings
         agent_embeddings_transformed_masked = np.concatenate(
             (
@@ -395,7 +366,6 @@ class LazyAgentsCentralized(gym.Env):
         # Get the preprocessed observation in a dict
         obs_preprocessed = {
             "agent_embeddings": agent_embeddings_transformed_unmasked,
-            # "net_topology": self.net_topology_full,
             "pad_tokens": self.is_padded,
         }
 
@@ -408,12 +378,6 @@ class LazyAgentsCentralized(gym.Env):
         self.agent_vel[pad_mask, :] = 0
         self.agent_ang[pad_mask, :] = 0
         self.agent_omg[pad_mask, :] = 0
-
-        # Pad network topology
-        # self.net_topology_full = np.pad(self.adjacency_matrix,
-        #                                 ((0, self.num_agents_max - self.num_agents),
-        #                                  (0, self.num_agents_max - self.num_agents)),
-        #                                 mode='constant')
 
         # Pad agent states
         out = self.concat_states(self.agent_pos, self.agent_vel, self.agent_ang, self.agent_omg)
@@ -441,10 +405,6 @@ class LazyAgentsCentralized(gym.Env):
         # You must update padding before updating the network topology because the padding is used in the update
         # Dim check!
         assert changes_in_agents.shape == (self.num_agents_max,)
-        # Check if there is any change
-        # if np.sum(change_in_agents**2) == 0:
-        #     return None
-
         # Update padding from the changes_in_agents
         # shapes: (num_agents_max,) in both cases
         gain_mask, loss_mask = self.update_padding_from_agent_changes(changes_in_agents)
@@ -460,9 +420,7 @@ class LazyAgentsCentralized(gym.Env):
         assert changes_in_agents.shape == (self.num_agents_max,)
         assert changes_in_agents.dtype == np.int32
 
-        # gain_idx = np.where(change_in_agents == 1)
         gain_mask = changes_in_agents == 1
-        # loss_idx = np.where(change_in_agents == -1)
         loss_mask = changes_in_agents == -1
 
         # Check if there's an invalid change (e.g. gain of existing agent, loss of non-existing agent)
@@ -486,8 +444,6 @@ class LazyAgentsCentralized(gym.Env):
         return gain_mask, loss_mask
 
     def update_topology_from_padding(self, init=False):
-        # Get the adjacency matrix
-        # adj_mat = self.view_adjacency_matrix()
         adj_mat = np.zeros((self.num_agents, self.num_agents), dtype=np.int32)
 
         # Get the network topology
@@ -575,11 +531,6 @@ class LazyAgentsCentralized(gym.Env):
              action: np.ndarray,
              ):
         obs, reward, done, info = self.auto_step(action) if self.do_auto_step else self.single_step(action)
-        # if self.do_auto_step:
-        #     obs, reward, done, info = self.auto_step(action)
-        # else:
-        #     obs, reward, done, info = self.single_step(action)
-
         return obs, reward, done, info
 
     def auto_step(self,
@@ -636,8 +587,6 @@ class LazyAgentsCentralized(gym.Env):
         #   Be careful! the control input uses the previous state (i.e. x_t, y_t, vx_t, vy_t, θ_t)
         #     This is because the current state may not be observable
         #     (e.g. in a decentralized network; forward compatibility)
-        # self.u_lazy = self.update_u(c_lazy, mask=mask)  # state transition 1/2  # outdated
-        # self.u_lazy = self.u_fully_active * c_lazy  # state transition 1/2  # outdated; implemented in the next line
         u_lazy_wo_disturbance = self.apply_laziness(
             c_lazy=c_lazy,
             u_fully_active=self.u_fully_active,
@@ -654,7 +603,6 @@ class LazyAgentsCentralized(gym.Env):
         self.update_state(u=self.u_lazy, mask=mask)  # state transition 2/2
 
         # Get observation
-        # self.u_fully_active = self.update_u(c=np.ones(self.num_agents_max), mask=mask)  # next_fully_active_control
         self.u_fully_active, self.u_fully_active_decomposed = self.get_u(mask=mask, get_decomposed_u=True)
         obs = None if self._skip_obs else \
             self.get_observation(get_preprocessed_obs=self.use_preprocessed_obs, mask=mask)  # next_observation
@@ -664,17 +612,13 @@ class LazyAgentsCentralized(gym.Env):
             if self.time_step < self.max_time_step-1:
                 self.state_hist[self.time_step+1, :, :] = self.agent_states
 
-        # Check if done,
-        # done = True if self.is_done(mask=mask) else False
+        # Check if done
         done = True if self.is_done_in_paper(mask=mask) else False
 
         # Compute reward
         rewards = self.compute_reward()
         rewards = self.penalize_incomplete_task(rewards)
-        # if not isinstance(rewards, np.ndarray):
-        #     print("What???")
         target_reward = rewards[1] if self.use_L2_norm else rewards[0]
-        # reward = -self.dt
         auxiliary_reward = self.compute_auxiliary_reward(rewards=rewards, target_reward=target_reward,)
 
         std_pos = self.std_pos_hist[self.time_step]
@@ -687,18 +631,6 @@ class LazyAgentsCentralized(gym.Env):
         # Update the clock time and the time step count
         self.clock_time += self.dt
         self.time_step += 1
-        # Here, the time step virtually already done, so we increment the time step count by 1
-        # as we may not notice the changes in agents at the very this time step (especially in a decentralized network)
-
-        # Get agent changes
-        #  We lose or gain agents after updating the state
-        #  This is because the agents may notice the changes in the next time step
-        changes_in_agents = self.get_agent_changes()
-
-        # Update the network topology
-        #  We may lose or gain edges from the changes of the swarm.
-        #  So we need to update the network topology, accordingly.
-        self.update_topology(changes_in_agents)  # This changes padding; be careful with silent updates (e.g. mask)
 
         # Get info
         info = {
@@ -872,31 +804,14 @@ class LazyAgentsCentralized(gym.Env):
         # (3) Update angle:
         # >>  ang_{t+1} = ang_t + w_t * dt;  Be careful: w_t is the angular velocity at time t, not t+1
         self.agent_ang[mask] = self.agent_ang[mask] + u[mask, np.newaxis] * self.dt
-        # Wrap the angle to [-pi, pi]  <- not necessary, right now
-        # self.agent_ang[mask] = self.wrap_to_pi(self.agent_ang[mask])
 
         # (4) Update velocity:
         # >>  v_{t+1} = V * [cos(ang_{t+1}), sin(ang_{t+1})]; Be careful: ang_{t+1} is the angle at time t+1
         self.agent_vel[mask] = self.v * np.concatenate(
             [np.cos(self.agent_ang[mask]), np.sin(self.agent_ang[mask])], axis=1)
 
-        # # (2-2) Update position:  # TODO: POSITION UPDATE CHANGED!! (If used)
-        # # >>  p_{t+1} = p_t + v_t * dt;  Be careful: v_t is the velocity at time t+1, not t
-        # self.agent_pos[mask] = self.agent_pos[mask] + self.agent_vel[mask] * self.dt
-
         # Update the state
         self.agent_states = self.concat_states(self.agent_pos, self.agent_vel, self.agent_ang, self.agent_omg)
-        # self.agent_states = self.pad_states()  # TODO: Do we (effectively) pad the states twice?
-
-    def get_agent_changes(self):
-        # loss or gain agents after updating the state
-        # changes_in_agents[i, 0] ==  0: no change in agent_i's existence
-        #                         ==  1: agent_i is gained as a new agent
-        #                         == -1: agent_i is lost
-
-        changes_in_agents = None
-
-        return changes_in_agents  # shape: (num_agents_max,) dtype: int32
 
     def compute_reward(self):
         # J_{energy}   = [V/N * sum_{i=1}^{N} sum_{k=1}^{t_c} ||u_i(k)||^2] + t_c : total cost throughout the time
@@ -909,7 +824,6 @@ class LazyAgentsCentralized(gym.Env):
         assert np.all(u_t[self.is_padded == 1] == 0)
 
         # Compute reward of all agents into a scalar: centralized
-        # control_cost = (self.v / self.num_agents) * np.sum(u_t ** 2)
         control_cost_L1 = self.dt * (self.v / self.num_agents) * np.linalg.norm(u_t, 1)  # from the paper
         control_cost_L2 = self.dt * (self.v / self.num_agents) * np.sum(u_t ** 2)  # sum of squares; matches the paper's J control term
         fuel_cost = self.dt
@@ -938,7 +852,6 @@ class LazyAgentsCentralized(gym.Env):
                 rewards = rewards + expectation_penalty*(pos_penalty + vel_penalty)
             else:
                 rewards = rewards + self.incomplete_episode_penalty
-            # print("Task was not completed within the maximum time step!")
 
         return rewards
 
@@ -975,8 +888,7 @@ class LazyAgentsCentralized(gym.Env):
         vel_converged = True if vel_std < self.std_vel_converged else False
         std_val_converged = True if pos_converged and vel_converged else False
 
-        # Check 2 and 3 only if the position standard deviation is smaller than the threshold
-        # if pos_converged and not self.use_fixed_horizon:
+        # Check 2 and 3 only if both std values are below threshold
         if std_val_converged and not self.use_fixed_horizon:
             # Only proceed if there have been at least 50 time steps
             if self.time_step >= 49:
@@ -1007,14 +919,6 @@ class LazyAgentsCentralized(gym.Env):
         # 4. Check if the maximum number of time steps is reached
         if self.time_step >= self.max_time_step-1:
             done = True
-
-        # # Print
-        # print(f"time_step: {self.time_step}, max_time_step: {self.max_time_step}")
-        # print(f"      pos_std: {pos_std},\n"
-        #       f"      vel_std: {vel_std},\n"
-        #       # f"      pos_rate_deviation: {max_last_n_pos_std-min_last_n_pos_std},\n"
-        #       # f"      vel_rate_deviation: {max_last_n_vel_std-min_last_n_vel_std},\n"
-        #       f"      done: {done}")
 
         return done
 
@@ -1057,7 +961,6 @@ class LazyAgentsCentralized(gym.Env):
         ax_std_hist.grid(True)
 
         plt.draw()
-        # plt.pause(0.001)
 
         return fig_std_hist, ax_std_hist
 
@@ -1107,7 +1010,6 @@ class LazyAgentsCentralized(gym.Env):
                                  color="r", angles="xy", scale_units="xy", scale=1)
         ax_trajectory.grid(True)
         plt.draw()
-        # plt.pause(0.001)
 
         return fig_trajectory, ax_trajectory
 
@@ -1230,13 +1132,10 @@ class LazyAgentsCentralized(gym.Env):
 
         # Get alpha
         alpha = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
-        if init_update:  # self.time_step == 0:
+        if init_update:
             alpha[mask] = r[mask]
         else:
-        # elif self.time_step > 0:
             alpha[mask] = r[mask] / self.r_max[mask]
-        # else:
-        #     raise ValueError(f"self.time_step must be non-negative! But self.time_step=={self.time_step}")
 
         # Get current v
         v_vec = np.zeros((self.num_agents_max, 2), dtype=np.float32)  # shape: (num_agents_max, 2)
@@ -1248,7 +1147,6 @@ class LazyAgentsCentralized(gym.Env):
         cos_phi[mask] = np.sum(v_vec[mask] * r_vec[mask], axis=1) / (v * r[mask])
         gamma = np.zeros((self.num_agents_max,), dtype=np.float32)  # shape: (num_agents_max,)
         gamma[mask] = 0.5 * (1 - cos_phi[mask])
-        # Clip gamma to be in the range [0, 1]
         # Clip to [0, 1] to handle floating point error
         gamma[mask] = np.clip(gamma[mask], 0, 1)
 
@@ -1280,17 +1178,11 @@ class LazyAgentsCentralizedPendReward(LazyAgentsCentralized):
         std_pos_target = self.std_pos_converged - 2.5
         std_pos_error = (std_pos - std_pos_target)**2  # (100-40)**2 = 3600
         pos_error_reward = - (1/3600) * np.maximum(std_pos_error, 0.0)
-        # std_pos_error = (std_pos - std_pos_target)  # (100-40) = 60
-        # pos_error_reward = - (1/60) * np.maximum(std_pos_error, 0.0)
-
         # Get velocity error reward
         std_vel = self.std_vel_hist[self.time_step]
         std_vel_target = self.std_vel_converged - 0.05
         std_vel_error = (std_vel - std_vel_target)**2  # (15-0.05)**2 = 223.5052
         vel_error_reward = - (1/220) * np.maximum(std_vel_error, 0.0)
-        # std_vel_error = (std_vel - std_vel_target)  # (15-0.05) = 14.95
-        # vel_error_reward = - (1/15) * np.maximum(std_vel_error, 0.0)
-
         # Get auxiliary reward
         w_con = 1.0 * self.w_control  # 0.02
         w_pos = 1.0 * self.w_pos  # 1.0
