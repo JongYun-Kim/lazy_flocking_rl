@@ -38,9 +38,14 @@ def main():
                         help="max function evaluations per PSO run (default: d*5000)")
     parser.add_argument("--seed_pso", action="store_true",
                         help="deterministic PSO seed control")
+    parser.add_argument("--seeds", type=int, nargs=2, default=None,
+                        metavar=("START", "END"),
+                        help="seed range [START, END) (default: SEEDS from config)")
     parser.add_argument("--resume", action="store_true",
                         help="resume from partial file")
     args = parser.parse_args()
+
+    seeds = list(range(args.seeds[0], args.seeds[1])) if args.seeds else SEEDS
 
     os.makedirs(TRAJ_DIR, exist_ok=True)
     partial_path = os.path.join(TRAJ_DIR, "pso_partial.json")
@@ -64,7 +69,7 @@ def main():
         print(f"Resuming: {len(done_seeds)} episodes already done")
 
     t_total = time.time()
-    for i, seed in enumerate(SEEDS):
+    for i, seed in enumerate(seeds):
         if seed in done_seeds:
             continue
 
@@ -99,7 +104,7 @@ def main():
         })
 
         print(
-            f"[{len(trajectories)}/{len(SEEDS)}] seed={seed}  "
+            f"[{len(trajectories)}/{len(seeds)}] seed={seed}  "
             f"opt={elapsed:.0f}s  steps={T}  cost={cost:.1f}"
         )
 
