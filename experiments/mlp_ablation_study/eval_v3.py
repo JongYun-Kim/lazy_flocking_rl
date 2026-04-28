@@ -4,6 +4,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+import json
 import numpy as np
 import copy
 import glob
@@ -27,7 +28,7 @@ env_config_base = {
     "max_time_step": max_time_step, "incomplete_episode_penalty": 0,
     "normalize_obs": True, "use_fixed_horizon": False,
     "use_L2_norm": False,
-    "use_heuristics": True, "_use_fixed_lazy_idx": True,
+    "use_heuristics": False, "_use_fixed_lazy_idx": True,
     "use_preprocessed_obs": True, "get_state_hist": False,
 }
 
@@ -58,31 +59,33 @@ for i, (name, d, ckpt, shared) in enumerate(zip(NAMES, v3_dirs, CKPT_ITERS, SHAR
 
 def run_episode(policy, env, max_steps):
     obs = env.reset()
-    reward_sum = 0.0
+    r_L1, r_L2 = 0.0, 0.0
     length = max_steps
     for t in range(max_steps):
         action = policy.compute_single_action(obs, explore=False)[0]
         action = np.clip(action, 0, 1)
         obs, reward, done, info = env.step(action)
-        reward_sum += reward
+        r_L1 += info["original_rewards"][0]
+        r_L2 += info["original_rewards"][1]
         if done:
             length = t + 1
             break
-    return reward_sum, length
+    return r_L1, r_L2, length
 
 
 def run_acs_episode(env, max_steps):
     obs = env.reset()
-    reward_sum = 0.0
+    r_L1, r_L2 = 0.0, 0.0
     length = max_steps
     for t in range(max_steps):
         action = env.get_fully_active_action()
         obs, reward, done, info = env.step(action)
-        reward_sum += reward
+        r_L1 += info["original_rewards"][0]
+        r_L2 += info["original_rewards"][1]
         if done:
             length = t + 1
             break
-    return reward_sum, length
+    return r_L1, r_L2, length
 
 
 if __name__ == "__main__":
@@ -105,26 +108,28 @@ if __name__ == "__main__":
     num_episodes = 100
     seeds = np.arange(1, 1 + num_episodes)
     all_names = list(MODELS.keys()) + ["ACS"]
-    results = {n: {"rewards": [], "lengths": []} for n in all_names}
+    results = {n: {"rewards_L1": [], "rewards_L2": [], "lengths": []} for n in all_names}
 
     print(f"\nRunning {num_episodes} episodes for {len(all_names)} models...")
     start = datetime.now()
 
     for ep in range(num_episodes):
         seed = int(seeds[ep])
-        env_tf.seed(seed); env_tf.reset()
-        env_mlp.seed(seed); env_mlp.reset()
 
         for name, info in MODELS.items():
             base_env = env_mlp if info["mlp"] else env_tf
             env_copy = copy.deepcopy(base_env)
-            r, l = run_episode(policies[name], env_copy, max_time_step)
-            results[name]["rewards"].append(r)
+            env_copy.seed(seed)
+            r1, r2, l = run_episode(policies[name], env_copy, max_time_step)
+            results[name]["rewards_L1"].append(r1)
+            results[name]["rewards_L2"].append(r2)
             results[name]["lengths"].append(l)
 
         env_copy = copy.deepcopy(env_tf)
-        r, l = run_acs_episode(env_copy, max_time_step)
-        results["ACS"]["rewards"].append(r)
+        env_copy.seed(seed)
+        r1, r2, l = run_acs_episode(env_copy, max_time_step)
+        results["ACS"]["rewards_L1"].append(r1)
+        results["ACS"]["rewards_L2"].append(r2)
         results["ACS"]["lengths"].append(l)
 
         if (ep + 1) % 20 == 0:
@@ -134,20 +139,39 @@ if __name__ == "__main__":
 
     print(f"\nDone in {datetime.now() - start}")
 
+    # --- Save results ---
+    save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "eval_v3_results.json")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    transformer_ckpt = MODELS["Transformer"]["ckpt"].split("checkpoint_")[1].split("/")[0]
+    save_doc = {
+        "num_episodes": num_episodes,
+        "env_config": env_config_base,
+        "param_counts": param_counts,
+        "shared": {n: MODELS[n]["shared"] for n in MODELS},
+        "ckpt_iters": {n.replace("MLP_", ""): int(MODELS[n]["ckpt"].split("checkpoint_")[1].split("/")[0])
+                       for n in MODELS if n != "Transformer"},
+        "transformer_ckpt_iter": int(transformer_ckpt),
+        "results": results,
+    }
+    with open(save_path, "w") as f:
+        json.dump(save_doc, f, indent=2)
+    print(f"\nResults saved to {save_path}")
+
     # --- Report ---
     print("\n" + "=" * 110)
     print("FINAL EVALUATION — MLP Ablation v3")
     print(f"Environment: LazyAgentsCentralized | use_fixed_horizon=False | use_L2_norm=False | Episodes: {num_episodes}")
     print("=" * 110)
 
-    tf_r = np.array(results["Transformer"]["rewards"])
+    tf_r = np.array(results["Transformer"]["rewards_L1"])
 
     header = f"{'Model':<22s} {'Shared':>6s} {'Params':>10s} {'Ckpt':>5s} {'Reward':>8s} {'Gap':>8s} {'±std':>7s} {'Conv%':>6s} {'ConvLen':>8s} {'EpLen':>8s}"
     print(header)
     print("-" * 110)
 
     for name in all_names:
-        rews = np.array(results[name]["rewards"])
+        rews = np.array(results[name]["rewards_L1"])
         lens = np.array(results[name]["lengths"])
         conv = lens < max_time_step
         conv_len = f"{lens[conv].mean():.0f}" if conv.any() else "—"
@@ -156,7 +180,6 @@ if __name__ == "__main__":
         if name in MODELS:
             shared = "Yes" if MODELS[name]["shared"] else "No"
             params = f"{param_counts[name]:,}"
-            # Extract ckpt iter from path
             ckpt_str = MODELS[name]["ckpt"].split("checkpoint_")[1].split("/")[0]
             ckpt_num = ckpt_str.lstrip("0") or "0"
         else:
